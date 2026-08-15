@@ -70,7 +70,7 @@ export function WhatIfPanel({
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 8 }}
-          className="absolute bottom-28 left-1/2 z-[1000] w-[21rem] -translate-x-1/2 rounded-xl border border-sky-400/25 bg-black/80 px-4 py-3 shadow-2xl backdrop-blur-md"
+          className="absolute bottom-20 left-1/2 z-[1000] w-[21rem] max-w-[calc(100vw-1rem)] -translate-x-1/2 rounded-xl border border-sky-400/25 bg-black/80 px-4 py-3 shadow-2xl backdrop-blur-md sm:bottom-28"
         >
           <div className="mb-2 flex items-center justify-between">
             <span className="text-[10px] font-semibold uppercase tracking-widest text-sky-300">
@@ -135,7 +135,7 @@ export function RiskCard({
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      className="absolute bottom-5 left-5 z-[1000] w-72 rounded-xl border border-white/10 bg-black/75 p-3.5 shadow-xl backdrop-blur-md"
+      className="absolute bottom-20 left-3 z-[1000] w-72 max-w-[calc(100vw-1.5rem)] rounded-xl border border-white/10 bg-black/75 p-3.5 shadow-xl backdrop-blur-md sm:bottom-5 sm:left-5"
     >
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400">

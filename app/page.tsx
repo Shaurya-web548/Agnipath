@@ -390,7 +390,7 @@ export default function Home() {
             }}
           />
           {mode !== "sim" && (
-            <div className="absolute left-5 top-[132px] z-[1000]">
+            <div className="absolute left-3 top-[122px] z-[1000] max-h-[calc(100vh-200px)] overflow-y-auto sm:left-5 sm:top-[132px]">
               {mode === "shelters" ? (
                 <ShelterFinder
                   scenario={scenario}
@@ -458,7 +458,7 @@ export default function Home() {
         </>
       )}
 
-      <div className="absolute right-5 top-5 z-[1000] flex flex-col items-end gap-3">
+      <div className="absolute right-3 top-3 z-[1000] flex flex-col items-end gap-2 sm:right-5 sm:top-5 sm:gap-3">
         {!recMode && (
           <>
             <StatsBar

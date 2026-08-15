@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
+import { useDefaultCollapsedOnMobile } from "@/lib/useCollapsed";
 import {
   fallbackAdvisories,
   type Advisory,
@@ -45,6 +46,7 @@ export default function AdvisoryPanel({
   liveDot?: boolean;
 }) {
   const [lang, setLang] = useState<"en" | "hi">("en");
+  const [open, toggle] = useDefaultCollapsedOnMobile();
   const hourIdx = Math.min(
     advisories.length - 1,
     Math.max(0, Math.floor(currentHour))
@@ -59,10 +61,10 @@ export default function AdvisoryPanel({
       initial={{ opacity: 0, x: 16 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.8, delay: 2.8 }}
-      className="w-80 rounded-xl border border-white/10 bg-black/70 p-4 shadow-xl backdrop-blur-md"
+      className="w-72 max-w-[calc(100vw-1.5rem)] rounded-xl border border-white/10 bg-black/70 p-3 shadow-xl backdrop-blur-md sm:w-80 sm:p-4"
     >
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-2 sm:mb-2">
+        <button className="flex items-center gap-2" onClick={toggle}>
           <span
             className={`h-2 w-2 rounded-full ${
               liveDot ? "bg-green-400" : "bg-neutral-600"
@@ -70,9 +72,9 @@ export default function AdvisoryPanel({
             title={liveDot ? "live AI" : "offline advisory"}
           />
           <span className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400">
-            Advisory · H+{hourIdx}
+            📢 Advisory · H+{hourIdx} {open ? "▾" : "▸"}
           </span>
-        </div>
+        </button>
         <div className="flex overflow-hidden rounded-md border border-white/15 text-[11px]">
           <button
             onClick={() => setLang("en")}
@@ -97,22 +99,36 @@ export default function AdvisoryPanel({
         </div>
       </div>
 
-      <span
-        className={`inline-block rounded-md border px-2 py-0.5 text-[11px] font-bold tracking-wider ${urgencyStyles[advisory.urgency]}`}
-      >
-        {advisory.urgency}
-      </span>
+      <div className={open ? "block" : "hidden"}>
+        <span
+          className={`mt-2 inline-block rounded-md border px-2 py-0.5 text-[11px] font-bold tracking-wider ${urgencyStyles[advisory.urgency]}`}
+        >
+          {advisory.urgency}
+        </span>
 
-      <h2 className="mt-2 text-sm font-semibold leading-snug text-neutral-100">
-        {advisory.headline}
-      </h2>
+        <h2 className="mt-2 text-sm font-semibold leading-snug text-neutral-100">
+          {advisory.headline}
+        </h2>
 
-      <p className="mt-1.5 min-h-[7.5rem] text-[13px] leading-relaxed text-neutral-300">
-        {typed}
-        {typed.length < body.length && (
-          <span className="animate-pulse text-orange-400">▍</span>
-        )}
-      </p>
+        <p className="mt-1.5 min-h-[7.5rem] text-[13px] leading-relaxed text-neutral-300">
+          {typed}
+          {typed.length < body.length && (
+            <span className="animate-pulse text-orange-400">▍</span>
+          )}
+        </p>
+      </div>
+      {!open && (
+        <div className="mt-1 flex items-center gap-2">
+          <span
+            className={`inline-block rounded-md border px-1.5 py-0.5 text-[10px] font-bold tracking-wider ${urgencyStyles[advisory.urgency]}`}
+          >
+            {advisory.urgency}
+          </span>
+          <span className="truncate text-xs text-neutral-300">
+            {advisory.headline}
+          </span>
+        </div>
+      )}
     </motion.div>
   );
 }

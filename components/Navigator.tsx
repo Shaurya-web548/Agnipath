@@ -39,37 +39,43 @@ export function NavTabs({
   onMode: (m: AppMode) => void;
   onSwitchRole: () => void;
 }) {
-  const MODES: { id: AppMode; label: string }[] = [
-    { id: "sim", label: "🎬 Simulation" },
-    { id: "shelters", label: "🧭 Find shelter" },
-    { id: "briefing", label: role === "authority" ? "🛡️ Command" : "📋 Briefing" },
+  const MODES: { id: AppMode; icon: string; text: string }[] = [
+    { id: "sim", icon: "🎬", text: "Simulation" },
+    { id: "shelters", icon: "🧭", text: "Find shelter" },
+    role === "authority"
+      ? { id: "briefing", icon: "🛡️", text: "Command" }
+      : { id: "briefing", icon: "📋", text: "Briefing" },
   ];
+  const roleLabel = role ? ROLE_LABEL[role] : "Choose role";
   return (
     <motion.div
       initial={{ opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.8, delay: 2 }}
-      className="absolute left-5 top-[86px] z-[1000] flex overflow-hidden rounded-xl border border-white/10 bg-black/70 text-xs shadow-xl backdrop-blur-md"
+      className="absolute left-3 top-[78px] z-[1000] flex overflow-hidden rounded-xl border border-white/10 bg-black/70 text-xs shadow-xl backdrop-blur-md sm:left-5 sm:top-[86px]"
     >
       {MODES.map((m) => (
         <button
           key={m.id}
           onClick={() => onMode(m.id)}
-          className={`px-3 py-2 transition-colors ${
+          title={m.text}
+          className={`px-2.5 py-2 transition-colors sm:px-3 ${
             mode === m.id
               ? "bg-orange-600/80 text-white"
               : "text-neutral-300 hover:bg-white/10"
           }`}
         >
-          {m.label}
+          {m.icon}
+          <span className="hidden sm:inline"> {m.text}</span>
         </button>
       ))}
       <button
         onClick={onSwitchRole}
-        title="Switch role"
-        className="border-l border-white/10 px-3 py-2 text-neutral-300 hover:bg-white/10"
+        title={`Switch role (now: ${roleLabel})`}
+        className="border-l border-white/10 px-2.5 py-2 text-neutral-300 hover:bg-white/10 sm:px-3"
       >
-        {role ? ROLE_LABEL[role] : "Choose role"} ⇄
+        <span className="sm:hidden">{roleLabel.split(" ")[0]} ⇄</span>
+        <span className="hidden sm:inline">{roleLabel} ⇄</span>
       </button>
     </motion.div>
   );
@@ -102,7 +108,7 @@ export function ShelterFinder({
   const recommended = rows.find((r) => r.safe);
 
   return (
-    <div className="w-72 rounded-xl border border-white/10 bg-black/70 p-3.5 shadow-xl backdrop-blur-md">
+    <div className="w-72 max-w-[calc(100vw-1.5rem)] rounded-xl border border-white/10 bg-black/70 p-3.5 shadow-xl backdrop-blur-md">
       <div className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-neutral-400">
         Where should I go? · H+{Math.floor(currentHour)}
       </div>
@@ -203,7 +209,7 @@ export function BriefingPanel({
   const compass = bearingToCompass(params.windBearingDeg);
 
   return (
-    <div className="w-72 rounded-xl border border-white/10 bg-black/70 p-3.5 shadow-xl backdrop-blur-md">
+    <div className="w-72 max-w-[calc(100vw-1.5rem)] rounded-xl border border-white/10 bg-black/70 p-3.5 shadow-xl backdrop-blur-md">
       <div className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-neutral-400">
         Situation briefing · H+{h}
       </div>
@@ -395,7 +401,7 @@ export function CommandPanel({
   );
 
   return (
-    <div className="max-h-[calc(100vh-200px)] w-80 overflow-y-auto rounded-xl border border-amber-400/30 bg-black/75 p-3.5 shadow-xl backdrop-blur-md">
+    <div className="max-h-[calc(100vh-220px)] w-80 max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-xl border border-amber-400/30 bg-black/75 p-3.5 shadow-xl backdrop-blur-md">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-[10px] font-semibold uppercase tracking-widest text-amber-300">
           🛡️ Command console · H+{Math.floor(currentHour)}
