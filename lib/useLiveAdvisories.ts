@@ -1,41 +1,41 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { type Advisory } from "@/data/fallbackAdvisories";
+import { advisoriesFor } from "@/data/advisories";
 import {
-  fallbackAdvisories,
-  type Advisory,
-} from "@/data/fallbackAdvisories";
-import { shelters, shelterIsSafe, coneReachKm, wind } from "@/data/scenario";
+  type Scenario,
+  shelterIsSafe,
+  roadIsOpen,
+  coneReachKm,
+} from "@/data/scenarios";
 
 const CLIENT_TIMEOUT_MS = 4000;
 const VALID_URGENCY = new Set(["ADVISORY", "WARNING", "EVACUATE"]);
 
 /**
- * Optional live-AI advisories. Tries /api/advise once per whole hour with a
- * 4s timeout and an in-memory cache; on ANY failure the canned fallback is
- * used silently. Returns the advisory list (fallback overridden where live
+ * Optional live-AI advisories. Tries /api/advise once per scenario+hour with
+ * a 4s timeout and an in-memory cache; on ANY failure the canned/generated
+ * advisory is used silently. Returns the advisory list (overridden where live
  * results exist) and whether the current hour is live.
  */
-export function useLiveAdvisories(currentHour: number) {
+export function useLiveAdvisories(scenario: Scenario, currentHour: number) {
+  const baseAdvisories = advisoriesFor(scenario);
   const hourIdx = Math.min(
-    fallbackAdvisories.length - 1,
+    baseAdvisories.length - 1,
     Math.max(0, Math.floor(currentHour))
   );
-  const [liveByHour, setLiveByHour] = useState<Map<number, Advisory>>(
-    () => new Map()
-  );
-  const inFlightRef = useRef<Set<number>>(new Set());
-  const failedRef = useRef<Set<number>>(new Set());
+  const cacheKey = `${scenario.id}:${hourIdx}`;
+  const [live, setLive] = useState<Map<string, Advisory>>(() => new Map());
+  const inFlightRef = useRef<Set<string>>(new Set());
+  const failedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
+    const key = cacheKey;
     const hour = hourIdx;
-    if (
-      liveByHour.has(hour) ||
-      inFlightRef.current.has(hour) ||
-      failedRef.current.has(hour)
-    )
+    if (live.has(key) || inFlightRef.current.has(key) || failedRef.current.has(key))
       return;
-    inFlightRef.current.add(hour);
+    inFlightRef.current.add(key);
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), CLIENT_TIMEOUT_MS);
@@ -45,13 +45,18 @@ export function useLiveAdvisories(currentHour: number) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         hour,
-        coneReachKm: coneReachKm(hour),
-        shelterStatuses: shelters.map((s) => ({
+        region: scenario.region,
+        coneReachKm: coneReachKm(scenario, hour),
+        shelterStatuses: scenario.shelters.map((s) => ({
           name: s.name,
-          safe: shelterIsSafe(s, hour),
+          safe: shelterIsSafe(scenario, s, hour),
         })),
-        windKmh: wind.speedKmh,
-        bearingDeg: wind.bearingDeg,
+        roadStatuses: scenario.roads.map((r) => ({
+          name: r.name,
+          open: roadIsOpen(scenario, r, hour),
+        })),
+        windKmh: scenario.wind.speedKmh,
+        bearingDeg: scenario.wind.bearingDeg,
       }),
       signal: controller.signal,
     })
@@ -66,24 +71,23 @@ export function useLiveAdvisories(currentHour: number) {
           !VALID_URGENCY.has(a.urgency)
         )
           throw new Error("shape");
-        setLiveByHour((old) => new Map(old).set(hour, a as Advisory));
+        setLive((old) => new Map(old).set(key, a as Advisory));
       })
       .catch(() => {
         // Silent: the fallback advisory simply stays in place.
-        failedRef.current.add(hour);
+        failedRef.current.add(key);
       })
       .finally(() => {
         clearTimeout(timeout);
-        inFlightRef.current.delete(hour);
+        inFlightRef.current.delete(key);
       });
     // NOTE: no cleanup abort — a request outliving its hour is still cacheable.
-  }, [hourIdx, liveByHour]);
+  }, [cacheKey, hourIdx, live, scenario]);
 
   const advisories = useMemo(
-    () =>
-      fallbackAdvisories.map((fb, i) => liveByHour.get(i) ?? fb),
-    [liveByHour]
+    () => baseAdvisories.map((fb, i) => live.get(`${scenario.id}:${i}`) ?? fb),
+    [baseAdvisories, live, scenario.id]
   );
 
-  return { advisories, isLive: liveByHour.has(hourIdx) };
+  return { advisories, isLive: live.has(cacheKey) };
 }

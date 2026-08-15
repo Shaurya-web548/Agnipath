@@ -177,6 +177,37 @@ body {
   100% { transform: scale(5); opacity: 0; }
 }
 
+/* ── Road checkpoints ── */
+.road-dot {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.road-dot.open {
+  width: 10px;
+  height: 10px;
+  margin: 4px;
+  border-radius: 2px;
+  background: #64748b;
+  border: 1.5px solid #94a3b8;
+  opacity: 0.85;
+}
+
+.road-dot.closed {
+  filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.8));
+  animation: road-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes road-pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.18); }
+}
+
 /* ── Wind widget streaks ── */
 .wind-streak {
   position: absolute;

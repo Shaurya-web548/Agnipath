@@ -8,8 +8,10 @@ const VALID_URGENCY = new Set(["ADVISORY", "WARNING", "EVACUATE"]);
 
 type AdvisePayload = {
   hour: number;
+  region?: string;
   coneReachKm: number;
   shelterStatuses: { name: string; safe: boolean }[];
+  roadStatuses?: { name: string; open: boolean }[];
   windKmh: number;
   bearingDeg: number;
 };
@@ -33,13 +35,18 @@ export async function POST(req: Request) {
     .filter((s) => !s.safe)
     .map((s) => s.name);
 
-  const prompt = `You write official public evacuation advisories for a district disaster-management office in Uttarakhand, India.
+  const closedRoads = (payload.roadStatuses ?? [])
+    .filter((r) => !r.open)
+    .map((r) => r.name);
+
+  const prompt = `You write official public evacuation advisories for a district disaster-management office in ${payload.region || "Uttarakhand, India"}.
 
 Situation snapshot (hour ${payload.hour} of a wildfire event):
 - Projected fire-spread cone reach: ${payload.coneReachKm.toFixed(1)} km downwind
-- Wind: ${payload.windKmh} km/h blowing toward bearing ${payload.bearingDeg}° (northeast)
+- Wind: ${payload.windKmh} km/h blowing toward bearing ${payload.bearingDeg}°
 - Shelters currently SAFE: ${safe.length ? safe.join(", ") : "none"}
 - Shelters currently INSIDE the danger zone (closed): ${unsafe.length ? unsafe.join(", ") : "none"}
+- Road checkpoints CLOSED: ${closedRoads.length ? closedRoads.join(", ") : "none"}
 
 Write ONE advisory for this exact hour. Rules:
 - Plain, calm, official language. No dramatization, no exclamation marks.

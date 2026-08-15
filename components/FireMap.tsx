@@ -13,14 +13,17 @@ import {
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import {
-  fire,
-  shelters,
+  type Scenario,
+  type PointFeature,
   conePolygon,
+  smokePolygon,
   shelterIsSafe,
-  type Shelter,
-} from "@/data/scenario";
-const FIRE_CENTER: [number, number] = [fire.lat, fire.lng];
+  roadIsOpen,
+} from "@/data/scenarios";
+
 const INDIA_CENTER: [number, number] = [21.5, 78.5];
+
+export type MapFocus = { lat: number; lng: number; nonce: number } | null;
 
 const fireIcon = L.divIcon({
   className: "",
@@ -46,13 +49,26 @@ function shelterIcon(safe: boolean, justFlipped: boolean) {
   });
 }
 
+function roadIcon(open: boolean) {
+  return L.divIcon({
+    className: "",
+    html: open
+      ? '<div class="road-dot open"></div>'
+      : '<div class="road-dot closed">⛔</div>',
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
+  });
+}
+
 /**
  * Curved path from just outside the fire to just short of the shelter:
  * quadratic bezier bowed perpendicular to the straight line.
  */
-function evacCurve(to: Shelter): { points: [number, number][]; headBearing: number } {
+function evacCurve(
+  fire: { lat: number; lng: number },
+  to: PointFeature
+): { points: [number, number][]; headBearing: number } {
   const cosLat = Math.cos((fire.lat * Math.PI) / 180);
-  // project to a locally-flat plane
   const ax = fire.lng * cosLat;
   const ay = fire.lat;
   const bx = to.lng * cosLat;
@@ -61,13 +77,12 @@ function evacCurve(to: Shelter): { points: [number, number][]; headBearing: numb
   const my = (ay + by) / 2;
   const dx = bx - ax;
   const dy = by - ay;
-  // control point: midpoint pushed perpendicular for a gentle bow
   const cx = mx - dy * 0.35;
   const cy = my + dx * 0.35;
 
   const points: [number, number][] = [];
   for (let i = 0; i <= 24; i++) {
-    const t = 0.14 + (0.92 - 0.14) * (i / 24); // trim ends for breathing room
+    const t = 0.14 + (0.92 - 0.14) * (i / 24);
     const x = (1 - t) * (1 - t) * ax + 2 * (1 - t) * t * cx + t * t * bx;
     const y = (1 - t) * (1 - t) * ay + 2 * (1 - t) * t * cy + t * t * by;
     points.push([y, x / cosLat]);
@@ -91,33 +106,67 @@ function arrowheadIcon(bearingDeg: number) {
 }
 
 /** Cinematic intro: wide India view, then fly to the fire. */
-function IntroFly() {
+function IntroFly({ target }: { target: [number, number] }) {
   const map = useMap();
   const flown = useRef(false);
   useEffect(() => {
     if (flown.current) return;
     flown.current = true;
     const t = setTimeout(() => {
-      map.flyTo(FIRE_CENTER, 11, { duration: 2.5 });
+      map.flyTo(target, 11, { duration: 2.5 });
     }, 500);
     return () => clearTimeout(t);
-  }, [map]);
+  }, [map, target]);
   return null;
 }
 
-export default function FireMap({ currentHour }: { currentHour: number }) {
+/** Pans to a user-requested feature (shelter finder "Locate" buttons). */
+function FocusFly({ focus }: { focus: MapFocus }) {
+  const map = useMap();
+  const lastNonce = useRef(0);
+  useEffect(() => {
+    if (!focus || focus.nonce === lastNonce.current) return;
+    lastNonce.current = focus.nonce;
+    map.flyTo([focus.lat, focus.lng], 12.5, { duration: 1.2 });
+  }, [map, focus]);
+  return null;
+}
+
+export default function FireMap({
+  scenario,
+  currentHour,
+  focus = null,
+}: {
+  scenario: Scenario;
+  currentHour: number;
+  focus?: MapFocus;
+}) {
+  const fireCenter: [number, number] = [scenario.fire.lat, scenario.fire.lng];
+
   const cone = useMemo(
-    () => conePolygon(currentHour).map((p) => [p.lat, p.lng] as [number, number]),
-    [currentHour]
+    () =>
+      conePolygon(scenario, currentHour).map(
+        (p) => [p.lat, p.lng] as [number, number]
+      ),
+    [scenario, currentHour]
+  );
+
+  const smoke = useMemo(
+    () =>
+      smokePolygon(scenario, currentHour).map(
+        (p) => [p.lat, p.lng] as [number, number]
+      ),
+    [scenario, currentHour]
   );
 
   const safeByName = useMemo(() => {
     const m = new Map<string, boolean>();
-    for (const s of shelters) m.set(s.name, shelterIsSafe(s, currentHour));
+    for (const s of scenario.shelters)
+      m.set(s.name, shelterIsSafe(scenario, s, currentHour));
     return m;
-  }, [currentHour]);
+  }, [scenario, currentHour]);
 
-  // Track which shelters flipped safe->unsafe recently (drives one-shot flip animation)
+  // One-shot flip animation bookkeeping
   const prevSafeRef = useRef<Map<string, boolean>>(new Map());
   const [justFlipped, setJustFlipped] = useState<Set<string>>(new Set());
   const flipTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -147,8 +196,11 @@ export default function FireMap({ currentHour }: { currentHour: number }) {
   }, []);
 
   const curves = useMemo(
-    () => new Map(shelters.map((s) => [s.name, evacCurve(s)])),
-    []
+    () =>
+      new Map(
+        scenario.shelters.map((s) => [s.name, evacCurve(scenario.fire, s)])
+      ),
+    [scenario]
   );
 
   return (
@@ -160,13 +212,31 @@ export default function FireMap({ currentHour }: { currentHour: number }) {
       className="h-full w-full"
       style={{ background: "#0a0a0f" }}
     >
-      <IntroFly />
+      <IntroFly target={fireCenter} />
+      <FocusFly focus={focus} />
       <TileLayer
         url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
         subdomains="abcd"
         maxZoom={20}
       />
+
+      {/* Smoke plume: wider + longer than the flame cone, drawn beneath it */}
+      {smoke.length >= 3 && (
+        <Polygon
+          positions={smoke}
+          pathOptions={{
+            color: "#94a3b8",
+            weight: 1,
+            opacity: 0.35,
+            dashArray: "3 6",
+            fillColor: "#94a3b8",
+            fillOpacity: 0.12,
+          }}
+        >
+          <Tooltip sticky>Smoke / low-visibility zone</Tooltip>
+        </Polygon>
+      )}
 
       {cone.length >= 3 && (
         <Polygon
@@ -179,11 +249,13 @@ export default function FireMap({ currentHour }: { currentHour: number }) {
             fillOpacity: 0.25,
             className: "cone-path",
           }}
-        />
+        >
+          <Tooltip sticky>Projected fire-spread zone</Tooltip>
+        </Polygon>
       )}
 
       {/* Curved evacuation arrows — only toward currently-safe shelters */}
-      {shelters.map((s) => {
+      {scenario.shelters.map((s) => {
         if (!safeByName.get(s.name)) return null;
         const { points, headBearing } = curves.get(s.name)!;
         return (
@@ -207,13 +279,30 @@ export default function FireMap({ currentHour }: { currentHour: number }) {
         );
       })}
 
-      <Marker position={FIRE_CENTER} icon={fireIcon} zIndexOffset={1000}>
+      <Marker position={fireCenter} icon={fireIcon} zIndexOffset={1000}>
         <Tooltip direction="top" offset={[0, -12]}>
-          Fire detected {fire.detectedAt} · confidence {fire.confidence}
+          Fire detected {scenario.fire.detectedAt} · confidence{" "}
+          {scenario.fire.confidence}
         </Tooltip>
       </Marker>
 
-      {shelters.map((s) => {
+      {scenario.roads.map((r) => {
+        const open = roadIsOpen(scenario, r, currentHour);
+        return (
+          <Marker
+            key={r.name}
+            position={[r.lat, r.lng]}
+            icon={roadIcon(open)}
+            zIndexOffset={400}
+          >
+            <Tooltip direction="top" offset={[0, -10]}>
+              {r.name} — {open ? "OPEN" : "CLOSED"}
+            </Tooltip>
+          </Marker>
+        );
+      })}
+
+      {scenario.shelters.map((s) => {
         const safe = safeByName.get(s.name)!;
         return (
           <Marker

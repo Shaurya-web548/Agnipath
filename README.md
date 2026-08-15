@@ -1,11 +1,23 @@
 # 🔥 AgniPath — Wildfire Evacuation Planner
 
-A hackathon prototype: a cinematic, dark, full-screen map that replays a
-wildfire scenario from a **saved satellite-data snapshot** (FIRMS-style,
-representative of the 2024 Uttarakhand fire season). A wind-driven spread cone
-grows as a time slider advances from hour 0 to hour 6; five evacuation shelters
-flip from safe to unsafe as the cone reaches them; an advisory panel rewrites
-the official evacuation message every hour in English and Hindi.
+**The goal:** when a wildfire starts, the hardest questions are human ones —
+*what is happening, where should I go, and what closes next?* AgniPath answers
+all three from one screen. It replays a wind-driven spread forecast from a
+**saved satellite-data snapshot** (FIRMS-style, representative of recent
+Himalayan fire seasons) and layers every danger it implies — the flame cone,
+the wider smoke/low-visibility plume, shelters flipping unsafe, road
+checkpoints closing — while an advisory panel rewrites the official evacuation
+message every hour in English and Hindi.
+
+Three ways in (welcome screen or the tabs, top-left):
+
+- **🎬 Simulation** — the cinematic 6-hour replay (the demo money moment)
+- **🧭 Find shelter** — ranked shelter list, nearest safe first, with Locate
+- **📋 Briefing** — one-glance responder summary of every current hazard
+
+Two regions ship in the scenario picker: **Uttarakhand — Bhowali forest** and
+**Himachal — Shimla forest belt**; each has its own fire, wind, shelters and
+road checkpoints, and the advisory text follows whichever is active.
 
 **Nothing on screen depends on a live network** except one optional AI call
 that has a canned fallback (and map tiles — see *Offline behaviour*).
