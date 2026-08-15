@@ -1,11 +1,33 @@
 "use client";
 
-import { MapContainer, TileLayer } from "react-leaflet";
+import { useMemo } from "react";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Polygon,
+  CircleMarker,
+  Tooltip,
+} from "react-leaflet";
+import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { fire, shelters, conePolygon, shelterIsSafe } from "@/data/scenario";
 
-const FIRE_CENTER: [number, number] = [29.38, 79.46];
+const FIRE_CENTER: [number, number] = [fire.lat, fire.lng];
 
-export default function FireMap() {
+const fireIcon = L.divIcon({
+  className: "",
+  html: `<div class="fire-marker"></div>`,
+  iconSize: [22, 22],
+  iconAnchor: [11, 11],
+});
+
+export default function FireMap({ currentHour }: { currentHour: number }) {
+  const cone = useMemo(
+    () => conePolygon(currentHour).map((p) => [p.lat, p.lng] as [number, number]),
+    [currentHour]
+  );
+
   return (
     <MapContainer
       center={FIRE_CENTER}
@@ -21,6 +43,45 @@ export default function FireMap() {
         subdomains="abcd"
         maxZoom={20}
       />
+
+      {cone.length >= 3 && (
+        <Polygon
+          positions={cone}
+          pathOptions={{
+            color: "#ff8c42",
+            weight: 2,
+            fillColor: "#ff5a1f",
+            fillOpacity: 0.25,
+          }}
+        />
+      )}
+
+      <Marker position={FIRE_CENTER} icon={fireIcon} zIndexOffset={1000}>
+        <Tooltip direction="top" offset={[0, -12]}>
+          Fire detected {fire.detectedAt} · confidence {fire.confidence}
+        </Tooltip>
+      </Marker>
+
+      {shelters.map((s) => {
+        const safe = shelterIsSafe(s, currentHour);
+        return (
+          <CircleMarker
+            key={s.name}
+            center={[s.lat, s.lng]}
+            radius={8}
+            pathOptions={{
+              color: safe ? "#22c55e" : "#ef4444",
+              weight: 2,
+              fillColor: safe ? "#16a34a" : "#dc2626",
+              fillOpacity: 0.85,
+            }}
+          >
+            <Tooltip direction="top" offset={[0, -8]}>
+              {s.name} — {safe ? "SAFE" : "UNSAFE"}
+            </Tooltip>
+          </CircleMarker>
+        );
+      })}
     </MapContainer>
   );
 }

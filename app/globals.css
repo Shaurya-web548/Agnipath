@@ -37,3 +37,12 @@ body {
 .leaflet-control-attribution a {
   color: #888 !important;
 }
+
+/* Basic fire marker — upgraded with glow + ripple rings in Stage 4 */
+.fire-marker {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffd166 0%, #ff5a1f 55%, #c1121f 100%);
+  box-shadow: 0 0 14px 4px rgba(255, 90, 31, 0.7);
+}
