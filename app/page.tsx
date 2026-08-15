@@ -16,6 +16,7 @@ import {
   BriefingPanel,
   CommandPanel,
   AboutModal,
+  AuthModal,
   type AppMode,
   type Role,
   type BroadcastEntry,
@@ -56,6 +57,7 @@ export default function Home() {
     {}
   );
   const [broadcasts, setBroadcasts] = useState<BroadcastEntry[]>([]);
+  const [authOpen, setAuthOpen] = useState(false);
   const [focus, setFocus] = useState<MapFocus>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [isWelcome, setIsWelcome] = useState(false);
@@ -297,8 +299,18 @@ export default function Home() {
       {role === "authority" && !recMode && (
         <>
           <div className="authority-frame z-[950]" />
-          <div className="absolute left-1/2 top-0 z-[1050] -translate-x-1/2 rounded-b-lg border border-t-0 border-amber-400/40 bg-amber-950/80 px-4 py-1 text-[11px] font-bold tracking-widest text-amber-300 backdrop-blur-md">
+          <div className="absolute left-1/2 top-0 z-[1050] flex -translate-x-1/2 items-center gap-3 rounded-b-lg border border-t-0 border-amber-400/40 bg-amber-950/80 px-4 py-1 text-[11px] font-bold tracking-widest text-amber-300 backdrop-blur-md">
             🛡️ AUTHORITY COMMAND MODE
+            <button
+              onClick={() => {
+                sessionStorage.removeItem("agnipath-authority");
+                setRole("viewer");
+                setMode("sim");
+              }}
+              className="rounded border border-amber-400/40 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-amber-200 hover:bg-amber-500/20"
+            >
+              SIGN OUT
+            </button>
           </div>
         </>
       )}
@@ -376,8 +388,29 @@ export default function Home() {
         welcome={isWelcome}
         onClose={() => setAboutOpen(false)}
         onPickRole={(r, m) => {
+          if (r === "authority") {
+            // Command Mode is gated: authenticate once per browser session.
+            if (sessionStorage.getItem("agnipath-authority") === "1") {
+              setRole("authority");
+              setMode(m);
+            } else {
+              setAuthOpen(true);
+            }
+            return;
+          }
           setRole(r);
           setMode(m);
+        }}
+      />
+
+      <AuthModal
+        open={authOpen}
+        onClose={() => setAuthOpen(false)}
+        onSuccess={() => {
+          sessionStorage.setItem("agnipath-authority", "1");
+          setAuthOpen(false);
+          setRole("authority");
+          setMode("briefing");
         }}
       />
     </main>

@@ -44,6 +44,13 @@ Open http://localhost:3000.
 4. Press **R** for REC mode: hides all controls (map + title + advisory stay)
    and auto-plays — used to record the backup demo video cleanly.
 
+## Authority access
+
+Command Mode (force-closing shelters/roads, broadcasting advisories) sits
+behind a sign-in: any officer ID plus access code **`AGNI-1070`** (demo-grade,
+client-side — a real deployment would use district SSO/OTP). Sign-out is on
+the amber command strip; the session remembers a successful sign-in.
+
 ## Live AI (optional)
 
 Copy `.env.example` to `.env.local` and set `GEMINI_API_KEY`

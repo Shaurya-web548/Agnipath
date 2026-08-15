@@ -343,6 +343,127 @@ export function CommandPanel({
   );
 }
 
+// Demo credential — documented in the README, deliberately not shown on screen.
+const AUTHORITY_ACCESS_CODE = "AGNI-1070";
+
+/**
+ * Gate in front of Authority Command Mode. Demo-grade authentication:
+ * a client-side access-code check, enough to keep casual users out and to
+ * demonstrate the restricted flow. A real deployment would use the district
+ * SSO / OTP instead.
+ */
+export function AuthModal({
+  open,
+  onClose,
+  onSuccess,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [officerId, setOfficerId] = useState("");
+  const [code, setCode] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = () => {
+    if (!officerId.trim()) {
+      setError("Enter your officer ID.");
+      return;
+    }
+    if (code.trim().toUpperCase() !== AUTHORITY_ACCESS_CODE) {
+      setError("Invalid access code. Contact the district control room.");
+      return;
+    }
+    setError(null);
+    setOfficerId("");
+    setCode("");
+    onSuccess();
+  };
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="absolute inset-0 z-[2100] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+          onClick={onClose}
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 16, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.98 }}
+            transition={{ type: "spring", stiffness: 300, damping: 28 }}
+            onClick={(e) => e.stopPropagation()}
+            className="mx-4 w-full max-w-sm rounded-2xl border border-amber-400/30 bg-neutral-950/95 p-6 shadow-2xl"
+          >
+            <div className="text-[10px] font-semibold uppercase tracking-widest text-amber-300">
+              🛡️ Restricted — authorities only
+            </div>
+            <h2 className="mt-1 text-lg font-semibold">
+              District authority sign-in
+            </h2>
+            <p className="mt-1 text-xs leading-snug text-neutral-400">
+              Command Mode can close shelters and broadcast advisories. Access
+              is limited to authorised district officers.
+            </p>
+
+            <label className="mt-4 block text-[11px] font-semibold uppercase tracking-widest text-neutral-400">
+              Officer ID
+            </label>
+            <input
+              value={officerId}
+              onChange={(e) => setOfficerId(e.target.value)}
+              placeholder="e.g. DDMA-NTL-042"
+              className="mt-1 w-full rounded-lg border border-white/15 bg-black/50 px-3 py-2 text-sm text-neutral-100 outline-none placeholder:text-neutral-600 focus:border-amber-400/50"
+            />
+
+            <label className="mt-3 block text-[11px] font-semibold uppercase tracking-widest text-neutral-400">
+              Access code
+            </label>
+            <input
+              type="password"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && submit()}
+              placeholder="••••••••"
+              className="mt-1 w-full rounded-lg border border-white/15 bg-black/50 px-3 py-2 text-sm text-neutral-100 outline-none placeholder:text-neutral-600 focus:border-amber-400/50"
+            />
+
+            {error && (
+              <motion.p
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-2 text-xs font-medium text-red-400"
+              >
+                {error}
+              </motion.p>
+            )}
+
+            <button
+              onClick={submit}
+              className="mt-4 w-full rounded-lg bg-amber-500 py-2 text-sm font-bold tracking-wide text-black hover:bg-amber-400"
+            >
+              SIGN IN
+            </button>
+            <button
+              onClick={onClose}
+              className="mt-2 w-full rounded-lg border border-white/15 py-1.5 text-xs text-neutral-300 hover:bg-white/10"
+            >
+              Cancel
+            </button>
+            <p className="mt-3 text-[10px] leading-snug text-neutral-600">
+              Demo authentication — a real deployment would use district SSO /
+              OTP. No credentials are stored or transmitted.
+            </p>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
 export function AboutModal({
   open,
   welcome,
