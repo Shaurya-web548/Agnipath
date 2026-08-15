@@ -59,6 +59,7 @@ export function useLiveAdvisories(currentHour: number) {
         if (!res.ok) throw new Error(String(res.status));
         const a = await res.json();
         if (
+          a.ok !== true ||
           typeof a.headline !== "string" ||
           typeof a.advisory_en !== "string" ||
           typeof a.advisory_hi !== "string" ||

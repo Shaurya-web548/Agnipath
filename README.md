@@ -1,36 +1,66 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🔥 AgniPath — Wildfire Evacuation Planner
 
-## Getting Started
+A hackathon prototype: a cinematic, dark, full-screen map that replays a
+wildfire scenario from a **saved satellite-data snapshot** (FIRMS-style,
+representative of the 2024 Uttarakhand fire season). A wind-driven spread cone
+grows as a time slider advances from hour 0 to hour 6; five evacuation shelters
+flip from safe to unsafe as the cone reaches them; an advisory panel rewrites
+the official evacuation message every hour in English and Hindi.
 
-First, run the development server:
+**Nothing on screen depends on a live network** except one optional AI call
+that has a canned fallback (and map tiles — see *Offline behaviour*).
+
+## Run
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## The demo (one take)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Page loads → map flies from a wide India view to the fire point.
+2. Press **PLAY ▶** → the 6-hour story runs in ~8 seconds:
+   - the wind cone grows smoothly toward the northeast,
+   - **Bhowali School Shelter** flips red around H+2.3 (shockwave + banner),
+   - **Jeolikote Panchayat Bhawan** flips around H+4.5,
+   - evacuation arrows to unsafe shelters disappear,
+   - stats tick and the advisory panel re-types at every whole hour.
+3. **EN / हिन्दी** toggles the advisory language.
+4. Press **R** for REC mode: hides all controls (map + title + advisory stay)
+   and auto-plays — used to record the backup demo video cleanly.
 
-## Learn More
+## Live AI (optional)
 
-To learn more about Next.js, take a look at the following resources:
+Copy `.env.example` to `.env.local` and set `GEMINI_API_KEY`
+(and optionally `GEMINI_MODEL`), then restart. The dot in the advisory panel
+turns green when an hour's advisory was written live by Gemini; on any error
+or a 4-second timeout the canned advisory is used silently. The API route
+always answers HTTP 200, so a missing key never even logs a console error.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Offline behaviour
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Everything runs from hardcoded data in `data/` — simulation, shelters,
+advisories. The only wifi dependencies:
 
-## Deploy on Vercel
+- **Map tiles** (CartoDB dark). The browser caches tiles it has already
+  displayed, so do one full zoom-in + PLAY run while online before demoing;
+  with wifi off afterwards the cached tiles keep rendering. Untouched areas
+  or zoom levels would show dark blanks.
+- **Live AI dot** — silently grey when offline. Nothing else changes.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Honesty
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The chip under the title — *"Simplified wind-cone model · snapshot data"* —
+stays visible in every state, including REC mode. The spread model is a plain
+sector: radius = 1.8 km/h × hours downwind, 30° half-angle around the wind
+bearing. It is a communication prototype, not a fire-behaviour model.
+
+## Stack
+
+Next.js 15 (App Router) · TypeScript · Tailwind 4 · react-leaflet 5 /
+Leaflet 1.9 (CartoDB dark tiles) · framer-motion. Geometry is two small
+helpers in `lib/geo.ts` (spherical destination point, ray-casting
+point-in-polygon) — no heavy geo libraries.

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
-// Optional live-AI layer. The client treats ANY non-200 or slow response as a
-// signal to use the canned fallback — this route can fail freely and silently.
+// Optional live-AI layer. Every failure returns 200 {ok:false} — never an
+// error status — so the demo browser console stays free of network errors;
+// the client silently falls back to the canned advisories.
 
 const VALID_URGENCY = new Set(["ADVISORY", "WARNING", "EVACUATE"]);
 
@@ -17,14 +18,14 @@ export async function POST(req: Request) {
   const apiKey = process.env.GEMINI_API_KEY;
   const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
   if (!apiKey) {
-    return NextResponse.json({ error: "not configured" }, { status: 503 });
+    return NextResponse.json({ ok: false });
   }
 
   let payload: AdvisePayload;
   try {
     payload = await req.json();
   } catch {
-    return NextResponse.json({ error: "bad request" }, { status: 400 });
+    return NextResponse.json({ ok: false });
   }
 
   const safe = payload.shelterStatuses.filter((s) => s.safe).map((s) => s.name);
@@ -67,13 +68,13 @@ Respond with ONLY this JSON object, no markdown fences:
       }
     );
     if (!res.ok) {
-      return NextResponse.json({ error: "upstream" }, { status: 502 });
+      return NextResponse.json({ ok: false });
     }
     const data = await res.json();
     const text: unknown =
       data?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (typeof text !== "string") {
-      return NextResponse.json({ error: "empty" }, { status: 502 });
+      return NextResponse.json({ ok: false });
     }
     const parsed = JSON.parse(text.replace(/^```json\s*|```\s*$/g, ""));
     if (
@@ -82,15 +83,16 @@ Respond with ONLY this JSON object, no markdown fences:
       typeof parsed.advisory_hi !== "string" ||
       !VALID_URGENCY.has(parsed.urgency)
     ) {
-      return NextResponse.json({ error: "invalid shape" }, { status: 502 });
+      return NextResponse.json({ ok: false });
     }
     return NextResponse.json({
+      ok: true,
       headline: parsed.headline,
       advisory_en: parsed.advisory_en,
       advisory_hi: parsed.advisory_hi,
       urgency: parsed.urgency,
     });
   } catch {
-    return NextResponse.json({ error: "failed" }, { status: 502 });
+    return NextResponse.json({ ok: false });
   }
 }
