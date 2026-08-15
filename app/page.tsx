@@ -1,8 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import ControlBar, { type PlayState } from "@/components/ControlBar";
+import {
+  TitleChip,
+  WindWidget,
+  StatsBar,
+  WarningBanners,
+} from "@/components/Overlays";
+import { shelters, shelterIsSafe } from "@/data/scenario";
 
 // Leaflet touches `window` at module scope — it must never run during SSR.
 const FireMap = dynamic(() => import("@/components/FireMap"), {
@@ -16,6 +23,7 @@ const FireMap = dynamic(() => import("@/components/FireMap"), {
 
 const PLAY_DURATION_MS = 8000;
 const MAX_HOUR = 6;
+const BANNER_MS = 4000;
 
 // Gentle ease-in-out so the cone starts and settles smoothly.
 const easeInOutCubic = (t: number) =>
@@ -25,8 +33,41 @@ export default function Home() {
   const [currentHour, setCurrentHour] = useState(0);
   const [playState, setPlayState] = useState<PlayState>("idle");
   const rafRef = useRef<number | null>(null);
-  // Progress (0..1 of eased timeline) already covered when play was paused/scrubbed.
   const startProgressRef = useRef(0);
+
+  const safeCount = useMemo(
+    () => shelters.filter((s) => shelterIsSafe(s, currentHour)).length,
+    [currentHour]
+  );
+
+  // Warning banners: appear when a shelter flips safe -> unsafe, auto-dismiss.
+  const [banners, setBanners] = useState<string[]>([]);
+  const prevSafeRef = useRef<Map<string, boolean>>(
+    new Map(shelters.map((s) => [s.name, true]))
+  );
+  // Dismiss timers live in a ref: effect cleanup must NOT cancel them, because
+  // this effect re-runs on every animation frame while playing.
+  const bannerTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => {
+    const prev = prevSafeRef.current;
+    const flipped: string[] = [];
+    for (const s of shelters) {
+      const safe = shelterIsSafe(s, currentHour);
+      if (prev.get(s.name) === true && !safe) flipped.push(s.name);
+      prev.set(s.name, safe);
+    }
+    if (flipped.length === 0) return;
+    setBanners((old) => [...old, ...flipped.filter((f) => !old.includes(f))]);
+    bannerTimersRef.current.push(
+      setTimeout(() => {
+        setBanners((old) => old.filter((b) => !flipped.includes(b)));
+      }, BANNER_MS)
+    );
+  }, [currentHour]);
+  useEffect(() => {
+    const timers = bannerTimersRef.current;
+    return () => timers.forEach(clearTimeout);
+  }, []);
 
   const stopAnimation = useCallback(() => {
     if (rafRef.current !== null) {
@@ -39,14 +80,14 @@ export default function Home() {
 
   const handlePlay = useCallback(() => {
     if (playState === "playing") {
-      // PAUSE: remember how far along the (linear) timeline we are.
       stopAnimation();
       setPlayState("idle");
       return;
     }
 
     // REPLAY restarts from zero; PLAY resumes from the current hour.
-    const fromHour = playState === "done" ? 0 : currentHour >= MAX_HOUR ? 0 : currentHour;
+    const fromHour =
+      playState === "done" ? 0 : currentHour >= MAX_HOUR ? 0 : currentHour;
     startProgressRef.current = fromHour / MAX_HOUR;
     setPlayState("playing");
 
@@ -56,13 +97,10 @@ export default function Home() {
     const frame = (ts: number) => {
       if (startTs === null) startTs = ts;
       const t = remaining === 0 ? 1 : Math.min(1, (ts - startTs) / remaining);
-      // Ease only the remaining segment so resume doesn't jump.
       const linear =
         startProgressRef.current + (1 - startProgressRef.current) * t;
       const eased =
-        startProgressRef.current === 0
-          ? easeInOutCubic(linear)
-          : linear; // resuming mid-way: keep it linear to avoid a visible snap
+        startProgressRef.current === 0 ? easeInOutCubic(linear) : linear;
       setCurrentHour(Math.min(MAX_HOUR, eased * MAX_HOUR));
       if (t < 1) {
         rafRef.current = requestAnimationFrame(frame);
@@ -85,8 +123,21 @@ export default function Home() {
   );
 
   return (
-    <main className="fixed inset-0 bg-[#0a0a0f]">
+    <main className="fixed inset-0 overflow-hidden bg-[#0a0a0f]">
       <FireMap currentHour={currentHour} />
+
+      {/* cinematic overlays (below UI, above map) */}
+      <div className="vignette z-[900]" />
+      <div className="film-grain z-[901]" />
+
+      <TitleChip />
+      <WarningBanners banners={banners} />
+
+      <div className="absolute right-5 top-5 z-[1000] flex flex-col items-end gap-3">
+        <WindWidget />
+        <StatsBar currentHour={currentHour} safeCount={safeCount} />
+      </div>
+
       <ControlBar
         currentHour={currentHour}
         playState={playState}

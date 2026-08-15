@@ -38,11 +38,201 @@ body {
   color: #888 !important;
 }
 
-/* Basic fire marker — upgraded with glow + ripple rings in Stage 4 */
-.fire-marker {
+/* ── Fire marker: glowing core + radar-ping ripple rings + embers ── */
+.fire-wrap {
+  position: relative;
   width: 22px;
   height: 22px;
+}
+
+.fire-core {
+  position: absolute;
+  inset: 0;
   border-radius: 50%;
   background: radial-gradient(circle, #ffd166 0%, #ff5a1f 55%, #c1121f 100%);
-  box-shadow: 0 0 14px 4px rgba(255, 90, 31, 0.7);
+  box-shadow: 0 0 16px 5px rgba(255, 90, 31, 0.75);
+  animation: fire-glow 1.6s ease-in-out infinite alternate;
+}
+
+@keyframes fire-glow {
+  from { box-shadow: 0 0 12px 3px rgba(255, 90, 31, 0.6); }
+  to   { box-shadow: 0 0 22px 8px rgba(255, 140, 66, 0.85); }
+}
+
+.fire-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 140, 66, 0.8);
+  animation: fire-ping 2.4s cubic-bezier(0, 0.4, 0.6, 1) infinite;
+}
+
+.fire-ring2 {
+  animation-delay: 1.2s;
+}
+
+@keyframes fire-ping {
+  0%   { transform: scale(1); opacity: 0.9; }
+  100% { transform: scale(4.2); opacity: 0; }
+}
+
+/* Tiny embers floating up from the fire */
+.ember {
+  position: absolute;
+  bottom: 8px;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #ffb35c;
+  opacity: 0;
+  animation: ember-rise 3.2s ease-out infinite;
+  pointer-events: none;
+}
+
+.ember.e1 { left: 4px;  animation-delay: 0s;    }
+.ember.e2 { left: 10px; animation-delay: 0.7s;  }
+.ember.e3 { left: 16px; animation-delay: 1.3s;  }
+.ember.e4 { left: 7px;  animation-delay: 1.9s;  }
+.ember.e5 { left: 13px; animation-delay: 2.5s;  }
+
+@keyframes ember-rise {
+  0%   { transform: translate(0, 0) scale(1); opacity: 0; }
+  10%  { opacity: 0.9; }
+  100% { transform: translate(6px, -46px) scale(0.4); opacity: 0; }
+}
+
+/* ── Cone edge: marching-ants dashed stroke ── */
+.cone-path {
+  animation: dash-march 1.2s linear infinite;
+}
+
+@keyframes dash-march {
+  to { stroke-dashoffset: -36; }
+}
+
+/* ── Evacuation arrows: slow dash flow toward the shelter ── */
+.evac-arrow {
+  animation: dash-flow 2.8s linear infinite;
+}
+
+@keyframes dash-flow {
+  to { stroke-dashoffset: -32; }
+}
+
+.evac-arrowhead {
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 10px solid #22c55e;
+  opacity: 0.9;
+  transform-origin: 50% 60%;
+}
+
+/* ── Shelter markers ── */
+.shelter-dot {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid;
+}
+
+.shelter-dot.safe {
+  background: #16a34a;
+  border-color: #22c55e;
+  box-shadow: 0 0 8px 1px rgba(34, 197, 94, 0.5);
+}
+
+.shelter-dot.unsafe {
+  background: #dc2626;
+  border-color: #ef4444;
+  box-shadow: 0 0 10px 2px rgba(239, 68, 68, 0.6);
+}
+
+/* Played once when a shelter flips to unsafe: bounce + shockwave */
+.shelter-dot.just-flipped {
+  animation: shelter-bounce 0.55s cubic-bezier(0.28, 0.84, 0.42, 1) 1;
+}
+
+@keyframes shelter-bounce {
+  0%   { transform: translateY(0) scale(1); }
+  30%  { transform: translateY(-12px) scale(1.15); }
+  55%  { transform: translateY(0) scale(0.95); }
+  72%  { transform: translateY(-5px) scale(1.05); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+.shockwave {
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 3px solid rgba(239, 68, 68, 0.9);
+  animation: shockwave-out 0.5s ease-out 1 forwards;
+  pointer-events: none;
+}
+
+@keyframes shockwave-out {
+  0%   { transform: scale(1); opacity: 1; }
+  100% { transform: scale(5); opacity: 0; }
+}
+
+/* ── Wind widget streaks ── */
+.wind-streak {
+  position: absolute;
+  height: 1.5px;
+  border-radius: 1px;
+  background: linear-gradient(90deg, transparent, rgba(148, 197, 255, 0.7), transparent);
+  animation: streak-drift 2.6s linear infinite;
+  opacity: 0;
+}
+
+.wind-streak.s1 { top: 26%; width: 26px; animation-delay: 0s; }
+.wind-streak.s2 { top: 50%; width: 34px; animation-delay: 0.9s; }
+.wind-streak.s3 { top: 72%; width: 22px; animation-delay: 1.7s; }
+
+@keyframes streak-drift {
+  0%   { transform: translateX(-24px); opacity: 0; }
+  25%  { opacity: 1; }
+  75%  { opacity: 1; }
+  100% { transform: translateX(56px); opacity: 0; }
+}
+
+.wind-compass {
+  animation: compass-pulse 3s ease-in-out infinite;
+}
+
+@keyframes compass-pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.06); }
+}
+
+/* ── Cinematic overlays: vignette + film grain ── */
+.vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 55%,
+    rgba(0, 0, 0, 0.28) 82%,
+    rgba(0, 0, 0, 0.55) 100%
+  );
+}
+
+.film-grain {
+  position: absolute;
+  inset: -100px;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: grain-jitter 0.9s steps(4) infinite;
+}
+
+@keyframes grain-jitter {
+  0%   { transform: translate(0, 0); }
+  25%  { transform: translate(-30px, 18px); }
+  50%  { transform: translate(22px, -26px); }
+  75%  { transform: translate(-14px, -12px); }
+  100% { transform: translate(0, 0); }
 }
