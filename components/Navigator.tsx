@@ -241,12 +241,15 @@ export function AboutModal({
               🔥 AgniPath — Wildfire Evacuation Planner
             </h1>
 
-            <div className="mt-4 space-y-2">
+            <div className="mt-1 text-[11px] font-semibold uppercase tracking-widest text-neutral-400">
+              Who are you?
+            </div>
+            <div className="mt-2 space-y-2">
               {(
                 [
-                  ["sim", "🎬 Watch the simulation", "Replay the 6-hour spread story with PLAY."],
-                  ["shelters", "🧭 Find a safe shelter", "For residents: ranked shelters, nearest safe first, plus helplines."],
-                  ["briefing", "📋 Situation briefing", "For authorities: closures at a glance, hourly EN/हिन्दी advisory drafts ready to broadcast."],
+                  ["shelters", "🧑 I'm a resident", "Find the nearest safe shelter, evacuation routes and emergency helplines."],
+                  ["briefing", "🛡️ I'm an authority / responder", "Situation briefing, shelter and road closures, hourly EN/हिन्दी advisory drafts ready to broadcast."],
+                  ["sim", "🎬 Just show me the simulation", "Replay the full 6-hour spread story with PLAY."],
                 ] as [AppMode, string, string][]
               ).map(([id, label, desc]) => (
                 <button
