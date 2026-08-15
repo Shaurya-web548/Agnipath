@@ -203,7 +203,7 @@ export function Legend() {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.8, delay: 3 }}
-      className="absolute bottom-5 left-5 z-[1000] rounded-xl border border-white/10 bg-black/70 px-3.5 py-2.5 shadow-xl backdrop-blur-md"
+      className="absolute bottom-5 right-5 z-[1000] rounded-xl border border-white/10 bg-black/70 px-3.5 py-2.5 shadow-xl backdrop-blur-md"
     >
       <div className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-neutral-400">
         Legend
