@@ -390,7 +390,7 @@ export default function Home() {
             }}
           />
           {mode !== "sim" && (
-            <div className="absolute left-3 top-[122px] z-[1000] max-h-[calc(100vh-200px)] overflow-y-auto sm:left-5 sm:top-[132px]">
+            <div className="absolute left-3 top-[268px] z-[1001] max-h-[calc(100vh-346px)] overflow-y-auto sm:left-5 sm:top-[132px] sm:max-h-[calc(100vh-200px)]">
               {mode === "shelters" ? (
                 <ShelterFinder
                   scenario={scenario}
@@ -458,7 +458,8 @@ export default function Home() {
         </>
       )}
 
-      <div className="absolute right-3 top-3 z-[1000] flex flex-col items-end gap-2 sm:right-5 sm:top-5 sm:gap-3">
+      {/* mobile: pill row under the tabs; desktop: column top-right */}
+      <div className="absolute right-3 top-[122px] z-[1010] flex max-w-[calc(100vw-1.5rem)] flex-row flex-wrap items-start justify-end gap-2 sm:right-5 sm:top-5 sm:z-[1000] sm:max-w-none sm:flex-col sm:items-end sm:gap-3">
         {!recMode && (
           <>
             <StatsBar

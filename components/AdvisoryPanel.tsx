@@ -61,7 +61,9 @@ export default function AdvisoryPanel({
       initial={{ opacity: 0, x: 16 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.8, delay: 2.8 }}
-      className="w-72 max-w-[calc(100vw-1.5rem)] rounded-xl border border-white/10 bg-black/70 p-3 shadow-xl backdrop-blur-md sm:w-80 sm:p-4"
+      className={`${
+        open ? "w-72" : "w-auto"
+      } max-w-[calc(100vw-1.5rem)] rounded-xl border border-white/10 bg-black/70 p-3 shadow-xl backdrop-blur-md sm:w-80 sm:p-4`}
     >
       <div className="flex items-center justify-between gap-2 sm:mb-2">
         <button className="flex items-center gap-2" onClick={toggle}>
@@ -124,7 +126,7 @@ export default function AdvisoryPanel({
           >
             {advisory.urgency}
           </span>
-          <span className="truncate text-xs text-neutral-300">
+          <span className="max-w-[38vw] truncate text-xs text-neutral-300 sm:max-w-none">
             {advisory.headline}
           </span>
         </div>
