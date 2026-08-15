@@ -1,32 +1,36 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   type Scenario,
   helplines,
   coneReachKm,
   smokeReachKm,
-  shelterIsSafe,
-  roadIsOpen,
   bearingToCompass,
 } from "@/data/scenarios";
 import type { MapFocus } from "@/components/FireMap";
 
 export type AppMode = "sim" | "shelters" | "briefing";
+export type Role = "resident" | "authority" | "viewer";
 
-const MODES: { id: AppMode; label: string }[] = [
-  { id: "sim", label: "🎬 Simulation" },
-  { id: "shelters", label: "🧭 Find shelter" },
-  { id: "briefing", label: "📋 Briefing" },
-];
+/** Effective (model + authority overrides) statuses, keyed by feature name. */
+export type StatusMap = Record<string, boolean>;
 
 export function NavTabs({
   mode,
+  role,
   onMode,
 }: {
   mode: AppMode;
+  role: Role | null;
   onMode: (m: AppMode) => void;
 }) {
+  const MODES: { id: AppMode; label: string }[] = [
+    { id: "sim", label: "🎬 Simulation" },
+    { id: "shelters", label: "🧭 Find shelter" },
+    { id: "briefing", label: role === "authority" ? "🛡️ Command" : "📋 Briefing" },
+  ];
   return (
     <motion.div
       initial={{ opacity: 0, y: -8 }}
@@ -54,14 +58,16 @@ export function NavTabs({
 export function ShelterFinder({
   scenario,
   currentHour,
+  shelterStatus,
   onLocate,
 }: {
   scenario: Scenario;
   currentHour: number;
+  shelterStatus: StatusMap;
   onLocate: (f: MapFocus) => void;
 }) {
   const rows = scenario.shelters
-    .map((s) => ({ ...s, safe: shelterIsSafe(scenario, s, currentHour) }))
+    .map((s) => ({ ...s, safe: shelterStatus[s.name] }))
     .sort((a, b) =>
       a.safe !== b.safe ? (a.safe ? -1 : 1) : a.distanceKm - b.distanceKm
     );
@@ -137,17 +143,17 @@ export function ShelterFinder({
 export function BriefingPanel({
   scenario,
   currentHour,
+  shelterStatus,
+  roadStatus,
 }: {
   scenario: Scenario;
   currentHour: number;
+  shelterStatus: StatusMap;
+  roadStatus: StatusMap;
 }) {
   const h = Math.floor(currentHour);
-  const closedShelters = scenario.shelters.filter(
-    (s) => !shelterIsSafe(scenario, s, currentHour)
-  );
-  const closedRoads = scenario.roads.filter(
-    (r) => !roadIsOpen(scenario, r, currentHour)
-  );
+  const closedShelters = scenario.shelters.filter((s) => !shelterStatus[s.name]);
+  const closedRoads = scenario.roads.filter((r) => !roadStatus[r.name]);
   const compass = bearingToCompass(scenario.wind.bearingDeg);
 
   return (
@@ -196,14 +202,143 @@ export function BriefingPanel({
               : "Pre-position crews downwind; brief shelters on likely arrivals."}
           </dd>
         </div>
-        <div>
-          <dt className="font-semibold text-neutral-100">Authority actions</dt>
-          <dd>
-            Broadcast this hour&apos;s advisory (panel on the right, EN/हिन्दी),
-            update shelter and road status boards, staff the ⛔ checkpoints.
-          </dd>
-        </div>
       </dl>
+    </div>
+  );
+}
+
+export type BroadcastEntry = { id: number; hour: number; text: string };
+
+/**
+ * Authority-only command console: manual shelter/road overrides that the whole
+ * app (map, resident view, stats) reflects immediately, plus an advisory
+ * broadcast console with an ops log.
+ */
+export function CommandPanel({
+  scenario,
+  currentHour,
+  shelterStatus,
+  roadStatus,
+  advisoryText,
+  broadcasts,
+  onOverride,
+  onBroadcast,
+}: {
+  scenario: Scenario;
+  currentHour: number;
+  shelterStatus: StatusMap;
+  roadStatus: StatusMap;
+  advisoryText: string;
+  broadcasts: BroadcastEntry[];
+  onOverride: (kind: "shelter" | "road", name: string, open: boolean) => void;
+  onBroadcast: (text: string) => void;
+}) {
+  const [draft, setDraft] = useState(advisoryText);
+  useEffect(() => setDraft(advisoryText), [advisoryText]);
+
+  const row = (
+    kind: "shelter" | "road",
+    name: string,
+    open: boolean,
+    openLabel: string,
+    closedLabel: string
+  ) => (
+    <div
+      key={`${kind}:${name}`}
+      className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5"
+    >
+      <div className="min-w-0">
+        <div className="truncate text-xs font-medium text-neutral-100">
+          {name}
+        </div>
+        <div
+          className={`text-[10px] font-semibold ${open ? "text-green-400" : "text-red-400"}`}
+        >
+          {open ? openLabel : closedLabel}
+        </div>
+      </div>
+      <button
+        onClick={() => onOverride(kind, name, !open)}
+        className={`shrink-0 rounded-md border px-2 py-1 text-[10px] font-semibold ${
+          open
+            ? "border-red-400/40 text-red-300 hover:bg-red-500/15"
+            : "border-green-400/40 text-green-300 hover:bg-green-500/15"
+        }`}
+      >
+        {open ? "FORCE CLOSE" : "REOPEN"}
+      </button>
+    </div>
+  );
+
+  return (
+    <div className="max-h-[calc(100vh-200px)] w-80 overflow-y-auto rounded-xl border border-amber-400/30 bg-black/75 p-3.5 shadow-xl backdrop-blur-md">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-amber-300">
+          🛡️ Command console · H+{Math.floor(currentHour)}
+        </span>
+      </div>
+
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400">
+        Shelters — manual override
+      </div>
+      <div className="mt-1 space-y-1">
+        {scenario.shelters.map((s) =>
+          row("shelter", s.name, shelterStatus[s.name], "OPEN · SAFE", "CLOSED")
+        )}
+      </div>
+
+      <div className="mt-3 text-[10px] font-semibold uppercase tracking-widest text-neutral-400">
+        Road checkpoints — manual override
+      </div>
+      <div className="mt-1 space-y-1">
+        {scenario.roads.map((r) =>
+          row("road", r.name, roadStatus[r.name], "OPEN", "CLOSED")
+        )}
+      </div>
+
+      <div className="mt-3 text-[10px] font-semibold uppercase tracking-widest text-neutral-400">
+        Broadcast advisory
+      </div>
+      <textarea
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        rows={4}
+        className="mt-1 w-full resize-none rounded-lg border border-white/15 bg-black/50 p-2 text-[11px] leading-snug text-neutral-200 outline-none focus:border-amber-400/50"
+      />
+      <button
+        onClick={() => onBroadcast(draft)}
+        className="mt-1.5 w-full rounded-lg bg-amber-500 py-1.5 text-xs font-bold tracking-wide text-black hover:bg-amber-400"
+      >
+        📡 BROADCAST TO DISTRICT CHANNELS
+      </button>
+
+      {broadcasts.length > 0 && (
+        <>
+          <div className="mt-3 text-[10px] font-semibold uppercase tracking-widest text-neutral-400">
+            Ops log
+          </div>
+          <div className="mt-1 space-y-1">
+            {broadcasts
+              .slice(-4)
+              .reverse()
+              .map((b) => (
+                <div
+                  key={b.id}
+                  className="rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-neutral-400"
+                >
+                  <span className="font-mono text-amber-300">H+{b.hour}</span>{" "}
+                  broadcast · {b.text.slice(0, 60)}
+                  {b.text.length > 60 ? "…" : ""}
+                </div>
+              ))}
+          </div>
+        </>
+      )}
+
+      <p className="mt-2 text-[10px] leading-snug text-neutral-500">
+        Overrides apply instantly to the map and the resident view. Simulated
+        broadcast — no real messages are sent.
+      </p>
     </div>
   );
 }
@@ -212,12 +347,12 @@ export function AboutModal({
   open,
   welcome,
   onClose,
-  onPickMode,
+  onPickRole,
 }: {
   open: boolean;
   welcome: boolean;
   onClose: () => void;
-  onPickMode: (m: AppMode) => void;
+  onPickRole: (role: Role, mode: AppMode) => void;
 }) {
   return (
     <AnimatePresence>
@@ -247,15 +382,15 @@ export function AboutModal({
             <div className="mt-2 space-y-2">
               {(
                 [
-                  ["shelters", "🧑 I'm a resident", "Find the nearest safe shelter, evacuation routes and emergency helplines."],
-                  ["briefing", "🛡️ I'm an authority / responder", "Situation briefing, shelter and road closures, hourly EN/हिन्दी advisory drafts ready to broadcast."],
-                  ["sim", "🎬 Just show me the simulation", "Replay the full 6-hour spread story with PLAY."],
-                ] as [AppMode, string, string][]
-              ).map(([id, label, desc]) => (
+                  ["resident", "shelters", "🧑 I'm a resident", "Find the nearest safe shelter, evacuation routes and emergency helplines."],
+                  ["authority", "briefing", "🛡️ I'm an authority / responder", "Command console: force-close or reopen shelters and roads, broadcast hourly EN/हिन्दी advisories."],
+                  ["viewer", "sim", "🎬 Just show me the simulation", "Replay the full 6-hour spread story with PLAY."],
+                ] as [Role, AppMode, string, string][]
+              ).map(([role, mode, label, desc]) => (
                 <button
-                  key={id}
+                  key={role}
                   onClick={() => {
-                    onPickMode(id);
+                    onPickRole(role, mode);
                     onClose();
                   }}
                   className="block w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-left hover:border-orange-400/40 hover:bg-orange-500/10"
@@ -267,6 +402,7 @@ export function AboutModal({
                 </button>
               ))}
             </div>
+
             <p className="mt-3 text-[11px] leading-snug text-neutral-500">
               Simplified wind-cone model on snapshot data — a communication
               prototype, not a fire-behaviour model. Press R for recording mode.

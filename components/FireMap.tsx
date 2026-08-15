@@ -17,8 +17,6 @@ import {
   type PointFeature,
   conePolygon,
   smokePolygon,
-  shelterIsSafe,
-  roadIsOpen,
 } from "@/data/scenarios";
 
 const INDIA_CENTER: [number, number] = [21.5, 78.5];
@@ -135,10 +133,15 @@ function FocusFly({ focus }: { focus: MapFocus }) {
 export default function FireMap({
   scenario,
   currentHour,
+  shelterStatus,
+  roadStatus,
   focus = null,
 }: {
   scenario: Scenario;
   currentHour: number;
+  /** Effective statuses (model + authority overrides), keyed by name. */
+  shelterStatus: Record<string, boolean>;
+  roadStatus: Record<string, boolean>;
   focus?: MapFocus;
 }) {
   const fireCenter: [number, number] = [scenario.fire.lat, scenario.fire.lng];
@@ -159,12 +162,10 @@ export default function FireMap({
     [scenario, currentHour]
   );
 
-  const safeByName = useMemo(() => {
-    const m = new Map<string, boolean>();
-    for (const s of scenario.shelters)
-      m.set(s.name, shelterIsSafe(scenario, s, currentHour));
-    return m;
-  }, [scenario, currentHour]);
+  const safeByName = useMemo(
+    () => new Map(Object.entries(shelterStatus)),
+    [shelterStatus]
+  );
 
   // One-shot flip animation bookkeeping
   const prevSafeRef = useRef<Map<string, boolean>>(new Map());
@@ -287,7 +288,7 @@ export default function FireMap({
       </Marker>
 
       {scenario.roads.map((r) => {
-        const open = roadIsOpen(scenario, r, currentHour);
+        const open = roadStatus[r.name];
         return (
           <Marker
             key={r.name}

@@ -14,8 +14,11 @@ import {
   NavTabs,
   ShelterFinder,
   BriefingPanel,
+  CommandPanel,
   AboutModal,
   type AppMode,
+  type Role,
+  type BroadcastEntry,
 } from "@/components/Navigator";
 import type { MapFocus } from "@/components/FireMap";
 import {
@@ -47,6 +50,12 @@ const easeInOutCubic = (t: number) =>
 export default function Home() {
   const [scenario, setScenario] = useState(defaultScenario);
   const [mode, setMode] = useState<AppMode>("sim");
+  const [role, setRole] = useState<Role | null>(null);
+  // Authority overrides: "shelter:Name" / "road:Name" -> forced open/closed
+  const [overrides, setOverrides] = useState<Record<string, "open" | "closed">>(
+    {}
+  );
+  const [broadcasts, setBroadcasts] = useState<BroadcastEntry[]>([]);
   const [focus, setFocus] = useState<MapFocus>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [isWelcome, setIsWelcome] = useState(false);
@@ -66,16 +75,31 @@ export default function Home() {
 
   const { advisories, isLive } = useLiveAdvisories(scenario, currentHour);
 
+  // Effective statuses = model prediction, unless an authority override exists.
+  const shelterStatus = useMemo(() => {
+    const m: Record<string, boolean> = {};
+    for (const s of scenario.shelters) {
+      const ov = overrides[`shelter:${s.name}`];
+      m[s.name] = ov ? ov === "open" : shelterIsSafe(scenario, s, currentHour);
+    }
+    return m;
+  }, [scenario, currentHour, overrides]);
+  const roadStatus = useMemo(() => {
+    const m: Record<string, boolean> = {};
+    for (const r of scenario.roads) {
+      const ov = overrides[`road:${r.name}`];
+      m[r.name] = ov ? ov === "open" : roadIsOpen(scenario, r, currentHour);
+    }
+    return m;
+  }, [scenario, currentHour, overrides]);
+
   const safeCount = useMemo(
-    () =>
-      scenario.shelters.filter((s) => shelterIsSafe(scenario, s, currentHour))
-        .length,
-    [scenario, currentHour]
+    () => Object.values(shelterStatus).filter(Boolean).length,
+    [shelterStatus]
   );
   const roadsOpen = useMemo(
-    () =>
-      scenario.roads.filter((r) => roadIsOpen(scenario, r, currentHour)).length,
-    [scenario, currentHour]
+    () => Object.values(roadStatus).filter(Boolean).length,
+    [roadStatus]
   );
 
   // Warning banners for shelter flips and road closures, auto-dismissed.
@@ -84,31 +108,32 @@ export default function Home() {
   // Dismiss timers live in a ref: effect cleanup must NOT cancel them, because
   // this effect re-runs on every animation frame while playing.
   const bannerTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const pushBanners = useCallback((texts: string[]) => {
+    if (texts.length === 0) return;
+    setBanners((old) => [...old, ...texts.filter((b) => !old.includes(b))]);
+    bannerTimersRef.current.push(
+      setTimeout(() => {
+        setBanners((old) => old.filter((b) => !texts.includes(b)));
+      }, BANNER_MS)
+    );
+  }, []);
   useEffect(() => {
     const prev = prevOkRef.current;
     const newBanners: string[] = [];
-    for (const s of scenario.shelters) {
-      const safe = shelterIsSafe(scenario, s, currentHour);
-      const key = `shelter:${s.name}`;
+    for (const [name, safe] of Object.entries(shelterStatus)) {
+      const key = `shelter:${name}`;
       if (prev.get(key) === true && !safe)
-        newBanners.push(`⚠ ${s.name} is now inside the danger zone`);
+        newBanners.push(`⚠ ${name} is now inside the danger zone`);
       prev.set(key, safe);
     }
-    for (const r of scenario.roads) {
-      const open = roadIsOpen(scenario, r, currentHour);
-      const key = `road:${r.name}`;
+    for (const [name, open] of Object.entries(roadStatus)) {
+      const key = `road:${name}`;
       if (prev.get(key) === true && !open)
-        newBanners.push(`⛔ ${r.name} closed`);
+        newBanners.push(`⛔ ${name} closed`);
       prev.set(key, open);
     }
-    if (newBanners.length === 0) return;
-    setBanners((old) => [...old, ...newBanners.filter((b) => !old.includes(b))]);
-    bannerTimersRef.current.push(
-      setTimeout(() => {
-        setBanners((old) => old.filter((b) => !newBanners.includes(b)));
-      }, BANNER_MS)
-    );
-  }, [scenario, currentHour]);
+    pushBanners(newBanners);
+  }, [shelterStatus, roadStatus, pushBanners]);
   useEffect(() => {
     const timers = bannerTimersRef.current;
     return () => timers.forEach(clearTimeout);
@@ -184,9 +209,42 @@ export default function Home() {
       setPlayState("idle");
       setBanners([]);
       setFocus(null);
+      setOverrides({});
+      setBroadcasts([]);
       prevOkRef.current = new Map();
     },
     [stopAnimation]
+  );
+
+  // Authority actions ---------------------------------------------------
+  const handleOverride = useCallback(
+    (kind: "shelter" | "road", name: string, open: boolean) => {
+      setOverrides((old) => ({
+        ...old,
+        [`${kind}:${name}`]: open ? "open" : "closed",
+      }));
+      // Pre-set the banner-diff baseline so the model-flip banner doesn't
+      // also fire; the override gets its own message.
+      prevOkRef.current.set(`${kind}:${name}`, open);
+      pushBanners([
+        open
+          ? `🛡️ ${name} manually reopened by authority`
+          : `🛡️ ${name} manually closed by authority`,
+      ]);
+    },
+    [pushBanners]
+  );
+
+  const handleBroadcast = useCallback(
+    (text: string) => {
+      const hour = Math.floor(currentHour);
+      setBroadcasts((old) => [
+        ...old,
+        { id: (old.at(-1)?.id ?? 0) + 1, hour, text },
+      ]);
+      pushBanners([`📡 Advisory broadcast to district channels — H+${hour}`]);
+    },
+    [currentHour, pushBanners]
   );
 
   // REC mode: press R — hide controls, keep map + title + advisory, auto-play.
@@ -217,6 +275,8 @@ export default function Home() {
         key={scenario.id}
         scenario={scenario}
         currentHour={currentHour}
+        shelterStatus={shelterStatus}
+        roadStatus={roadStatus}
         focus={focus}
       />
 
@@ -234,19 +294,49 @@ export default function Home() {
       />
       <WarningBanners banners={banners} />
 
+      {role === "authority" && !recMode && (
+        <>
+          <div className="authority-frame z-[950]" />
+          <div className="absolute left-1/2 top-0 z-[1050] -translate-x-1/2 rounded-b-lg border border-t-0 border-amber-400/40 bg-amber-950/80 px-4 py-1 text-[11px] font-bold tracking-widest text-amber-300 backdrop-blur-md">
+            🛡️ AUTHORITY COMMAND MODE
+          </div>
+        </>
+      )}
+
       {!recMode && (
         <>
-          <NavTabs mode={mode} onMode={setMode} />
+          <NavTabs mode={mode} role={role} onMode={setMode} />
           {mode !== "sim" && (
             <div className="absolute left-5 top-[132px] z-[1000]">
               {mode === "shelters" ? (
                 <ShelterFinder
                   scenario={scenario}
                   currentHour={currentHour}
+                  shelterStatus={shelterStatus}
                   onLocate={setFocus}
                 />
+              ) : role === "authority" ? (
+                <CommandPanel
+                  scenario={scenario}
+                  currentHour={currentHour}
+                  shelterStatus={shelterStatus}
+                  roadStatus={roadStatus}
+                  advisoryText={
+                    advisories[
+                      Math.min(advisories.length - 1, Math.floor(currentHour))
+                    ].advisory_en
+                  }
+                  broadcasts={broadcasts}
+                  onOverride={handleOverride}
+                  onBroadcast={handleBroadcast}
+                />
               ) : (
-                <BriefingPanel scenario={scenario} currentHour={currentHour} />
+                <BriefingPanel
+                  scenario={scenario}
+                  currentHour={currentHour}
+                  shelterStatus={shelterStatus}
+                  roadStatus={roadStatus}
+                />
               )}
             </div>
           )}
@@ -285,7 +375,10 @@ export default function Home() {
         open={aboutOpen}
         welcome={isWelcome}
         onClose={() => setAboutOpen(false)}
-        onPickMode={setMode}
+        onPickRole={(r, m) => {
+          setRole(r);
+          setMode(m);
+        }}
       />
     </main>
   );
