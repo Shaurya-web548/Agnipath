@@ -6,7 +6,6 @@ import ControlBar, { type PlayState } from "@/components/ControlBar";
 import AdvisoryPanel from "@/components/AdvisoryPanel";
 import {
   TitleChip,
-  WindWidget,
   StatsBar,
   WarningBanners,
   Legend,
@@ -258,7 +257,6 @@ export default function Home() {
       <div className="absolute right-5 top-5 z-[1000] flex flex-col items-end gap-3">
         {!recMode && (
           <>
-            <WindWidget scenario={scenario} />
             <StatsBar
               scenario={scenario}
               currentHour={currentHour}
@@ -286,7 +284,6 @@ export default function Home() {
       <AboutModal
         open={aboutOpen}
         welcome={isWelcome}
-        scenario={scenario}
         onClose={() => setAboutOpen(false)}
         onPickMode={setMode}
       />

@@ -211,13 +211,11 @@ export function BriefingPanel({
 export function AboutModal({
   open,
   welcome,
-  scenario,
   onClose,
   onPickMode,
 }: {
   open: boolean;
   welcome: boolean;
-  scenario: Scenario;
   onClose: () => void;
   onPickMode: (m: AppMode) => void;
 }) {
@@ -243,22 +241,6 @@ export function AboutModal({
               🔥 AgniPath — Wildfire Evacuation Planner
             </h1>
 
-            <div className="mt-3 rounded-xl border border-red-500/30 bg-red-950/30 px-4 py-2.5">
-              <div className="text-[10px] font-semibold uppercase tracking-widest text-red-300">
-                In a real emergency, call
-              </div>
-              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-sm">
-                {helplines.map((h) => (
-                  <span key={h.number} className="text-neutral-200">
-                    <span className="font-mono font-bold text-red-300">
-                      {h.number}
-                    </span>{" "}
-                    <span className="text-xs text-neutral-400">{h.label}</span>
-                  </span>
-                ))}
-              </div>
-            </div>
-
             <div className="mt-4 space-y-2">
               {(
                 [
@@ -282,15 +264,6 @@ export function AboutModal({
                 </button>
               ))}
             </div>
-            <div className="mt-4 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-              <div className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400">
-                Why {scenario.name.split(" — ")[0]}?
-              </div>
-              <p className="mt-0.5 text-[11px] leading-snug text-neutral-400">
-                {scenario.whyHere}
-              </p>
-            </div>
-
             <p className="mt-3 text-[11px] leading-snug text-neutral-500">
               Simplified wind-cone model on snapshot data — a communication
               prototype, not a fire-behaviour model. Press R for recording mode.
