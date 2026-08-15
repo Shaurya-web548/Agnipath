@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import ControlBar, { type PlayState } from "@/components/ControlBar";
+import AdvisoryPanel from "@/components/AdvisoryPanel";
 import {
   TitleChip,
   WindWidget,
@@ -78,16 +79,8 @@ export default function Home() {
 
   useEffect(() => stopAnimation, [stopAnimation]);
 
-  const handlePlay = useCallback(() => {
-    if (playState === "playing") {
-      stopAnimation();
-      setPlayState("idle");
-      return;
-    }
-
-    // REPLAY restarts from zero; PLAY resumes from the current hour.
-    const fromHour =
-      playState === "done" ? 0 : currentHour >= MAX_HOUR ? 0 : currentHour;
+  const startPlay = useCallback((fromHour: number) => {
+    stopAnimation();
     startProgressRef.current = fromHour / MAX_HOUR;
     setPlayState("playing");
 
@@ -111,7 +104,39 @@ export default function Home() {
       }
     };
     rafRef.current = requestAnimationFrame(frame);
-  }, [playState, currentHour, stopAnimation]);
+  }, [stopAnimation]);
+
+  const handlePlay = useCallback(() => {
+    if (playState === "playing") {
+      stopAnimation();
+      setPlayState("idle");
+      return;
+    }
+    // REPLAY restarts from zero; PLAY resumes from the current hour.
+    const fromHour =
+      playState === "done" || currentHour >= MAX_HOUR ? 0 : currentHour;
+    startPlay(fromHour);
+  }, [playState, currentHour, stopAnimation, startPlay]);
+
+  // REC mode: press R — hide controls, keep map + title + advisory, auto-play.
+  const [recMode, setRecMode] = useState(false);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "r" && e.key !== "R") return;
+      const target = e.target as HTMLElement | null;
+      if (target && /INPUT|TEXTAREA|SELECT/.test(target.tagName)) return;
+      setRecMode((on) => !on);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  useEffect(() => {
+    if (!recMode) return;
+    setCurrentHour(0);
+    setPlayState("idle");
+    const t = setTimeout(() => startPlay(0), 800);
+    return () => clearTimeout(t);
+  }, [recMode, startPlay]);
 
   const handleScrub = useCallback(
     (hour: number) => {
@@ -134,16 +159,23 @@ export default function Home() {
       <WarningBanners banners={banners} />
 
       <div className="absolute right-5 top-5 z-[1000] flex flex-col items-end gap-3">
-        <WindWidget />
-        <StatsBar currentHour={currentHour} safeCount={safeCount} />
+        {!recMode && (
+          <>
+            <WindWidget />
+            <StatsBar currentHour={currentHour} safeCount={safeCount} />
+          </>
+        )}
+        <AdvisoryPanel currentHour={currentHour} />
       </div>
 
-      <ControlBar
-        currentHour={currentHour}
-        playState={playState}
-        onScrub={handleScrub}
-        onPlay={handlePlay}
-      />
+      {!recMode && (
+        <ControlBar
+          currentHour={currentHour}
+          playState={playState}
+          onScrub={handleScrub}
+          onPlay={handlePlay}
+        />
+      )}
     </main>
   );
 }
