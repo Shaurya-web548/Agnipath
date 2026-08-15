@@ -81,18 +81,32 @@ export function NavTabs({
   );
 }
 
+function PanelClose({ onClose }: { onClose: () => void }) {
+  return (
+    <button
+      onClick={onClose}
+      aria-label="Close panel"
+      className="rounded px-1.5 text-xs text-neutral-500 hover:bg-white/10 hover:text-white"
+    >
+      ✕
+    </button>
+  );
+}
+
 export function ShelterFinder({
   scenario,
   currentHour,
   params,
   shelterStatus,
   onLocate,
+  onClose,
 }: {
   scenario: Scenario;
   currentHour: number;
   params: SimParams;
   shelterStatus: StatusMap;
   onLocate: (f: MapFocus) => void;
+  onClose: () => void;
 }) {
   const rows = scenario.shelters
     .map((s) => {
@@ -109,8 +123,9 @@ export function ShelterFinder({
 
   return (
     <div className="w-72 max-w-[calc(100vw-1.5rem)] rounded-xl border border-white/10 bg-black/70 p-3.5 shadow-xl backdrop-blur-md">
-      <div className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-neutral-400">
-        Where should I go? · H+{Math.floor(currentHour)}
+      <div className="mb-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-widest text-neutral-400">
+        <span>Where should I go? · H+{Math.floor(currentHour)}</span>
+        <PanelClose onClose={onClose} />
       </div>
       <div className="space-y-1.5">
         {rows.map((s) => (
@@ -195,6 +210,7 @@ export function BriefingPanel({
   shelterStatus,
   roadStatus,
   onAuthorityLogin,
+  onClose,
 }: {
   scenario: Scenario;
   currentHour: number;
@@ -202,6 +218,7 @@ export function BriefingPanel({
   shelterStatus: StatusMap;
   roadStatus: StatusMap;
   onAuthorityLogin: () => void;
+  onClose: () => void;
 }) {
   const h = Math.floor(currentHour);
   const closedShelters = scenario.shelters.filter((s) => !shelterStatus[s.name]);
@@ -210,8 +227,9 @@ export function BriefingPanel({
 
   return (
     <div className="w-72 max-w-[calc(100vw-1.5rem)] rounded-xl border border-white/10 bg-black/70 p-3.5 shadow-xl backdrop-blur-md">
-      <div className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-neutral-400">
-        Situation briefing · H+{h}
+      <div className="mb-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-widest text-neutral-400">
+        <span>Situation briefing · H+{h}</span>
+        <PanelClose onClose={onClose} />
       </div>
       <dl className="space-y-1.5 text-xs text-neutral-300">
         <div>
@@ -282,6 +300,7 @@ export function CommandPanel({
   broadcasts,
   onOverride,
   onBroadcast,
+  onClose,
 }: {
   scenario: Scenario;
   currentHour: number;
@@ -292,6 +311,7 @@ export function CommandPanel({
   broadcasts: BroadcastEntry[];
   onOverride: (kind: "shelter" | "road", name: string, open: boolean) => void;
   onBroadcast: (text: string) => void;
+  onClose: () => void;
 }) {
   const [draft, setDraft] = useState(advisoryText);
   useEffect(() => setDraft(advisoryText), [advisoryText]);
@@ -406,6 +426,7 @@ export function CommandPanel({
         <span className="text-[10px] font-semibold uppercase tracking-widest text-amber-300">
           🛡️ Command console · H+{Math.floor(currentHour)}
         </span>
+        <PanelClose onClose={onClose} />
       </div>
 
       <div className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400">
@@ -710,11 +731,23 @@ export function AboutModal({
             exit={{ opacity: 0, y: 10, scale: 0.98 }}
             transition={{ type: "spring", stiffness: 300, damping: 28 }}
             onClick={(e) => e.stopPropagation()}
-            className="mx-4 w-full max-w-md rounded-2xl border border-white/10 bg-neutral-950/95 p-6 shadow-2xl"
+            className="relative mx-4 w-full max-w-md rounded-2xl border border-white/10 bg-neutral-950/95 p-6 shadow-2xl"
           >
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              className="absolute right-4 top-4 rounded px-1.5 text-sm text-neutral-500 hover:bg-white/10 hover:text-white"
+            >
+              ✕
+            </button>
             <h1 className="text-xl font-semibold">
-              🔥 AgniPath — Wildfire Evacuation Planner
+              {welcome ? "👋 Welcome" : "🔥 AgniPath — Wildfire Evacuation Planner"}
             </h1>
+            {welcome && (
+              <p className="mt-0.5 text-xs text-neutral-400">
+                to AgniPath — Wildfire Evacuation Planner
+              </p>
+            )}
 
             <div className="mt-1 text-[11px] font-semibold uppercase tracking-widest text-neutral-400">
               Who are you?

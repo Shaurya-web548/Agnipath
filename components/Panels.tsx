@@ -23,12 +23,14 @@ export function WhatIfPanel({
   params,
   onChange,
   onReset,
+  onClose,
 }: {
   open: boolean;
   scenario: Scenario;
   params: SimParams;
   onChange: (p: SimParams) => void;
   onReset: () => void;
+  onClose: () => void;
 }) {
   const base = defaultParams(scenario);
   const changed = JSON.stringify(params) !== JSON.stringify(base);
@@ -72,18 +74,27 @@ export function WhatIfPanel({
           exit={{ opacity: 0, y: 8 }}
           className="absolute bottom-20 left-1/2 z-[1000] w-[21rem] max-w-[calc(100vw-1rem)] -translate-x-1/2 rounded-xl border border-sky-400/25 bg-black/80 px-4 py-3 shadow-2xl backdrop-blur-md sm:bottom-28"
         >
-          <div className="mb-2 flex items-center justify-between">
+          <div className="mb-2 flex items-center justify-between gap-2">
             <span className="text-[10px] font-semibold uppercase tracking-widest text-sky-300">
               ⚗️ What-if simulation
             </span>
-            {changed && (
+            <span className="flex items-center gap-1.5">
+              {changed && (
+                <button
+                  onClick={onReset}
+                  className="rounded border border-white/15 px-1.5 py-0.5 text-[10px] text-neutral-300 hover:bg-white/10"
+                >
+                  Reset to snapshot
+                </button>
+              )}
               <button
-                onClick={onReset}
-                className="rounded border border-white/15 px-1.5 py-0.5 text-[10px] text-neutral-300 hover:bg-white/10"
+                onClick={onClose}
+                aria-label="Close what-if panel"
+                className="rounded px-1.5 text-xs text-neutral-500 hover:bg-white/10 hover:text-white"
               >
-                Reset to snapshot
+                ✕
               </button>
-            )}
+            </span>
           </div>
           <div className="space-y-2">
             {slider("Wind speed", params.windSpeedKmh, 5, 45, 1, " km/h", (v) =>

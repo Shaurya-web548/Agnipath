@@ -398,6 +398,7 @@ export default function Home() {
                   params={params}
                   shelterStatus={shelterStatus}
                   onLocate={setFocus}
+                  onClose={() => setMode("sim")}
                 />
               ) : role === "authority" ? (
                 <CommandPanel
@@ -414,6 +415,7 @@ export default function Home() {
                   broadcasts={broadcasts}
                   onOverride={handleOverride}
                   onBroadcast={handleBroadcast}
+                  onClose={() => setMode("sim")}
                 />
               ) : (
                 <BriefingPanel
@@ -423,6 +425,7 @@ export default function Home() {
                   shelterStatus={shelterStatus}
                   roadStatus={roadStatus}
                   onAuthorityLogin={enterAuthority}
+                  onClose={() => setMode("sim")}
                 />
               )}
             </div>
@@ -454,6 +457,7 @@ export default function Home() {
             params={params}
             onChange={setParams}
             onReset={() => setParams(defaultParams(scenario))}
+            onClose={() => setWhatIfOpen(false)}
           />
         </>
       )}

@@ -123,7 +123,7 @@ export function StatsBar({
         className="flex w-full items-center justify-between gap-4 text-[10px] font-semibold uppercase tracking-widest text-neutral-400"
       >
         <span>📊 Situation</span>
-        <span>{open ? "▾" : "▸"}</span>
+        <span>{open ? "✕" : "▸"}</span>
       </button>
       {!open && (
         <div className="mt-0.5 font-mono text-xs tabular-nums text-orange-300">
@@ -248,7 +248,7 @@ export function Legend({
         className="flex w-full items-center justify-between gap-4 text-[10px] font-semibold uppercase tracking-widest text-neutral-400"
       >
         <span>🗺️ Legend</span>
-        <span>{open ? "▾" : "▸"}</span>
+        <span>{open ? "✕" : "▸"}</span>
       </button>
       <div
         className={`${open ? "mt-1 block" : "hidden"} space-y-0.5 text-[11px] text-neutral-300`}

@@ -77,6 +77,16 @@ export default function AdvisoryPanel({
             📢 Advisory · H+{hourIdx} {open ? "▾" : "▸"}
           </span>
         </button>
+        <div className="flex items-center gap-1.5">
+        {open && (
+          <button
+            onClick={toggle}
+            aria-label="Collapse advisory"
+            className="rounded px-1 text-xs text-neutral-500 hover:bg-white/10 hover:text-white"
+          >
+            ✕
+          </button>
+        )}
         <div className="flex overflow-hidden rounded-md border border-white/15 text-[11px]">
           <button
             onClick={() => setLang("en")}
@@ -98,6 +108,7 @@ export default function AdvisoryPanel({
           >
             हिन्दी
           </button>
+        </div>
         </div>
       </div>
 
