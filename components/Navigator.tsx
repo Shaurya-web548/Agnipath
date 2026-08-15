@@ -22,14 +22,22 @@ export type Role = "resident" | "authority" | "viewer";
 /** Effective (model + authority overrides) statuses, keyed by feature name. */
 export type StatusMap = Record<string, boolean>;
 
+const ROLE_LABEL: Record<Role, string> = {
+  resident: "🧑 Resident",
+  authority: "🛡️ Authority",
+  viewer: "🎬 Viewer",
+};
+
 export function NavTabs({
   mode,
   role,
   onMode,
+  onSwitchRole,
 }: {
   mode: AppMode;
   role: Role | null;
   onMode: (m: AppMode) => void;
+  onSwitchRole: () => void;
 }) {
   const MODES: { id: AppMode; label: string }[] = [
     { id: "sim", label: "🎬 Simulation" },
@@ -56,6 +64,13 @@ export function NavTabs({
           {m.label}
         </button>
       ))}
+      <button
+        onClick={onSwitchRole}
+        title="Switch role"
+        className="border-l border-white/10 px-3 py-2 text-neutral-300 hover:bg-white/10"
+      >
+        {role ? ROLE_LABEL[role] : "Choose role"} ⇄
+      </button>
     </motion.div>
   );
 }
@@ -173,12 +188,14 @@ export function BriefingPanel({
   params,
   shelterStatus,
   roadStatus,
+  onAuthorityLogin,
 }: {
   scenario: Scenario;
   currentHour: number;
   params: SimParams;
   shelterStatus: StatusMap;
   roadStatus: StatusMap;
+  onAuthorityLogin: () => void;
 }) {
   const h = Math.floor(currentHour);
   const closedShelters = scenario.shelters.filter((s) => !shelterStatus[s.name]);
@@ -232,6 +249,12 @@ export function BriefingPanel({
           </dd>
         </div>
       </dl>
+      <button
+        onClick={onAuthorityLogin}
+        className="mt-2.5 w-full rounded-lg border border-amber-400/40 py-1.5 text-[11px] font-semibold text-amber-300 hover:bg-amber-500/15"
+      >
+        🛡️ Authority sign-in for Command Mode
+      </button>
     </div>
   );
 }

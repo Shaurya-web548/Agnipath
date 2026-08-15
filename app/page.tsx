@@ -297,6 +297,16 @@ export default function Home() {
     [currentHour, pushBanners]
   );
 
+  // Enter authority mode: authenticate once per browser session.
+  const enterAuthority = useCallback(() => {
+    if (sessionStorage.getItem("agnipath-authority") === "1") {
+      setRole("authority");
+      setMode("briefing");
+    } else {
+      setAuthOpen(true);
+    }
+  }, []);
+
   // REC mode: press R — hide controls, keep map + title + advisory, auto-play.
   const [recMode, setRecMode] = useState(false);
   useEffect(() => {
@@ -370,7 +380,15 @@ export default function Home() {
 
       {!recMode && (
         <>
-          <NavTabs mode={mode} role={role} onMode={setMode} />
+          <NavTabs
+            mode={mode}
+            role={role}
+            onMode={setMode}
+            onSwitchRole={() => {
+              setIsWelcome(false);
+              setAboutOpen(true);
+            }}
+          />
           {mode !== "sim" && (
             <div className="absolute left-5 top-[132px] z-[1000]">
               {mode === "shelters" ? (
@@ -404,6 +422,7 @@ export default function Home() {
                   params={params}
                   shelterStatus={shelterStatus}
                   roadStatus={roadStatus}
+                  onAuthorityLogin={enterAuthority}
                 />
               )}
             </div>
@@ -475,13 +494,7 @@ export default function Home() {
         onClose={() => setAboutOpen(false)}
         onPickRole={(r, m) => {
           if (r === "authority") {
-            // Command Mode is gated: authenticate once per browser session.
-            if (sessionStorage.getItem("agnipath-authority") === "1") {
-              setRole("authority");
-              setMode(m);
-            } else {
-              setAuthOpen(true);
-            }
+            enterAuthority();
             return;
           }
           setRole(r);
