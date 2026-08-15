@@ -4,11 +4,16 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   type Scenario,
+  type SimParams,
   helplines,
   coneReachKm,
   smokeReachKm,
   bearingToCompass,
+  timeToThreatMin,
+  formatEta,
+  zonePriorities,
 } from "@/data/scenarios";
+import { resourceRecommendations, answerLocally } from "@/lib/assistant";
 import type { MapFocus } from "@/components/FireMap";
 
 export type AppMode = "sim" | "shelters" | "briefing";
@@ -58,20 +63,28 @@ export function NavTabs({
 export function ShelterFinder({
   scenario,
   currentHour,
+  params,
   shelterStatus,
   onLocate,
 }: {
   scenario: Scenario;
   currentHour: number;
+  params: SimParams;
   shelterStatus: StatusMap;
   onLocate: (f: MapFocus) => void;
 }) {
   const rows = scenario.shelters
-    .map((s) => ({ ...s, safe: shelterStatus[s.name] }))
-    .sort((a, b) =>
-      a.safe !== b.safe ? (a.safe ? -1 : 1) : a.distanceKm - b.distanceKm
-    );
-  const nearestSafe = rows.find((r) => r.safe);
+    .map((s) => {
+      const eta = timeToThreatMin(scenario, s, currentHour, params);
+      // Best Shelter = distance + capacity headroom + fire risk (soon-threatened)
+      const score =
+        s.distanceKm +
+        (s.occupancyPct / 100) * 4 +
+        (eta !== null && eta <= 90 ? 6 : 0);
+      return { ...s, safe: shelterStatus[s.name], eta, score };
+    })
+    .sort((a, b) => (a.safe !== b.safe ? (a.safe ? -1 : 1) : a.score - b.score));
+  const recommended = rows.find((r) => r.safe);
 
   return (
     <div className="w-72 rounded-xl border border-white/10 bg-black/70 p-3.5 shadow-xl backdrop-blur-md">
@@ -84,7 +97,7 @@ export function ShelterFinder({
             key={s.name}
             className={`flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-xs ${
               s.safe
-                ? s.name === nearestSafe?.name
+                ? s.name === recommended?.name
                   ? "border-green-400/50 bg-green-500/15"
                   : "border-white/10 bg-white/5"
                 : "border-red-500/30 bg-red-950/40 opacity-70"
@@ -93,9 +106,9 @@ export function ShelterFinder({
             <div className="min-w-0">
               <div className="truncate font-medium text-neutral-100">
                 {s.name}
-                {s.name === nearestSafe?.name && (
+                {s.name === recommended?.name && (
                   <span className="ml-1.5 text-[10px] font-semibold text-green-300">
-                    NEAREST SAFE
+                    RECOMMENDED
                   </span>
                 )}
               </div>
@@ -103,6 +116,20 @@ export function ShelterFinder({
                 {s.distanceKm} km {bearingToCompass(s.bearingDeg)} ·{" "}
                 <span className={s.safe ? "text-green-400" : "text-red-400"}>
                   {s.safe ? "SAFE" : "UNSAFE"}
+                </span>
+                {s.safe && s.eta !== null && s.eta > 0 && (
+                  <span className="text-amber-300"> · {formatEta(s.eta)}</span>
+                )}
+              </div>
+              <div className="mt-0.5 flex items-center gap-1.5">
+                <div className="h-1 w-20 overflow-hidden rounded bg-white/10">
+                  <div
+                    className={`h-full ${s.occupancyPct > 80 ? "bg-red-400" : s.occupancyPct > 55 ? "bg-amber-400" : "bg-green-400"}`}
+                    style={{ width: `${s.occupancyPct}%` }}
+                  />
+                </div>
+                <span className="text-[10px] text-neutral-500">
+                  {s.occupancyPct}% of {s.capacity}
                 </span>
               </div>
             </div>
@@ -143,18 +170,20 @@ export function ShelterFinder({
 export function BriefingPanel({
   scenario,
   currentHour,
+  params,
   shelterStatus,
   roadStatus,
 }: {
   scenario: Scenario;
   currentHour: number;
+  params: SimParams;
   shelterStatus: StatusMap;
   roadStatus: StatusMap;
 }) {
   const h = Math.floor(currentHour);
   const closedShelters = scenario.shelters.filter((s) => !shelterStatus[s.name]);
   const closedRoads = scenario.roads.filter((r) => !roadStatus[r.name]);
-  const compass = bearingToCompass(scenario.wind.bearingDeg);
+  const compass = bearingToCompass(params.windBearingDeg);
 
   return (
     <div className="w-72 rounded-xl border border-white/10 bg-black/70 p-3.5 shadow-xl backdrop-blur-md">
@@ -172,10 +201,10 @@ export function BriefingPanel({
         <div>
           <dt className="font-semibold text-neutral-100">Spread</dt>
           <dd>
-            Danger zone {coneReachKm(scenario, currentHour).toFixed(1)} km{" "}
-            {compass}; smoke and low visibility to{" "}
-            {smokeReachKm(scenario, currentHour).toFixed(1)} km. Wind{" "}
-            {scenario.wind.speedKmh} km/h toward {compass}.
+            Danger zone {coneReachKm(scenario, currentHour, params).toFixed(1)}{" "}
+            km {compass}; smoke and low visibility to{" "}
+            {smokeReachKm(scenario, currentHour, params).toFixed(1)} km. Wind{" "}
+            {params.windSpeedKmh} km/h toward {compass}.
           </dd>
         </div>
         <div>
@@ -217,6 +246,7 @@ export type BroadcastEntry = { id: number; hour: number; text: string };
 export function CommandPanel({
   scenario,
   currentHour,
+  params,
   shelterStatus,
   roadStatus,
   advisoryText,
@@ -226,6 +256,7 @@ export function CommandPanel({
 }: {
   scenario: Scenario;
   currentHour: number;
+  params: SimParams;
   shelterStatus: StatusMap;
   roadStatus: StatusMap;
   advisoryText: string;
@@ -235,6 +266,76 @@ export function CommandPanel({
 }) {
   const [draft, setDraft] = useState(advisoryText);
   useEffect(() => setDraft(advisoryText), [advisoryText]);
+
+  // Assistant chat (live Gemini with silent offline fallback)
+  const [question, setQuestion] = useState("");
+  const [chat, setChat] = useState<{ q: string; a: string; live: boolean }[]>([]);
+  const [asking, setAsking] = useState(false);
+  const ask = async () => {
+    const q = question.trim();
+    if (!q || asking) return;
+    setAsking(true);
+    setQuestion("");
+    const ctx = {
+      scenario,
+      hour: Math.floor(currentHour),
+      params,
+      shelterStatus,
+      roadStatus,
+    };
+    const local = answerLocally(q, ctx);
+    let answer = local;
+    let live = false;
+    try {
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), 4000);
+      const res = await fetch("/api/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: q,
+          context: {
+            region: scenario.region,
+            hour: Math.floor(currentHour),
+            coneReachKm: +coneReachKm(scenario, currentHour, params).toFixed(1),
+            windKmh: params.windSpeedKmh,
+            windToward: bearingToCompass(params.windBearingDeg),
+            shelters: scenario.shelters.map((s) => ({
+              name: s.name,
+              safe: shelterStatus[s.name],
+              etaMin: timeToThreatMin(scenario, s, currentHour, params),
+              capacity: s.capacity,
+              occupancyPct: s.occupancyPct,
+            })),
+            roads: scenario.roads.map((r) => ({
+              name: r.name,
+              open: roadStatus[r.name],
+              etaMin: timeToThreatMin(scenario, r, currentHour, params),
+            })),
+            zones: zonePriorities(scenario, currentHour, params).map((z) => ({
+              name: z.zone.name,
+              population: z.zone.population,
+              riskPct: z.riskPct,
+              priority: z.label,
+            })),
+          },
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(t);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.ok === true && typeof data.answer === "string") {
+          answer = data.answer;
+          live = true;
+        }
+      }
+    } catch {
+      // silent — local answer stands
+    }
+    setChat((old) => [...old.slice(-2), { q, a: answer, live }]);
+    setAsking(false);
+  };
 
   const row = (
     kind: "shelter" | "road",
@@ -311,6 +412,95 @@ export function CommandPanel({
       >
         📡 BROADCAST TO DISTRICT CHANNELS
       </button>
+
+      <div className="mt-3 text-[10px] font-semibold uppercase tracking-widest text-neutral-400">
+        Evacuation priority (risk × population)
+      </div>
+      <div className="mt-1 space-y-1">
+        {zonePriorities(scenario, currentHour, params).map((z) => (
+          <div
+            key={z.zone.name}
+            className="flex items-center justify-between rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[11px]"
+          >
+            <span className="text-neutral-200">
+              {z.zone.name}{" "}
+              <span className="text-neutral-500">
+                · {z.zone.population.toLocaleString("en-IN")} · {z.riskPct}%
+              </span>
+            </span>
+            <span
+              className={`font-bold ${
+                z.label === "IMMEDIATE"
+                  ? "text-red-400"
+                  : z.label === "HIGH"
+                    ? "text-orange-400"
+                    : z.label === "MONITOR"
+                      ? "text-yellow-400"
+                      : "text-green-400"
+              }`}
+            >
+              {z.label}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 text-[10px] font-semibold uppercase tracking-widest text-neutral-400">
+        Resource recommendations
+      </div>
+      <div className="mt-1 space-y-1">
+        {resourceRecommendations(
+          scenario,
+          currentHour,
+          shelterStatus,
+          roadStatus,
+          params
+        ).map((rec) => (
+          <div
+            key={rec}
+            className="rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-neutral-300"
+          >
+            {rec}
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 text-[10px] font-semibold uppercase tracking-widest text-neutral-400">
+        Ask the ops assistant
+      </div>
+      <div className="mt-1 flex gap-1.5">
+        <input
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && ask()}
+          placeholder="Which areas should we evacuate first?"
+          className="w-full rounded-lg border border-white/15 bg-black/50 px-2.5 py-1.5 text-[11px] text-neutral-200 outline-none placeholder:text-neutral-600 focus:border-amber-400/50"
+        />
+        <button
+          onClick={ask}
+          disabled={asking}
+          className="shrink-0 rounded-lg border border-amber-400/40 px-2.5 text-xs text-amber-300 hover:bg-amber-500/15 disabled:opacity-50"
+        >
+          {asking ? "…" : "Ask"}
+        </button>
+      </div>
+      {chat.length > 0 && (
+        <div className="mt-1.5 space-y-1.5">
+          {chat.map((c, i) => (
+            <div key={i} className="rounded-md border border-white/10 bg-white/5 px-2 py-1.5">
+              <div className="text-[10px] font-semibold text-neutral-400">
+                {c.q}
+              </div>
+              <div className="mt-0.5 text-[11px] leading-snug text-neutral-200">
+                <span
+                  className={`mr-1 inline-block h-1.5 w-1.5 rounded-full ${c.live ? "bg-green-400" : "bg-neutral-600"}`}
+                />
+                {c.a}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {broadcasts.length > 0 && (
         <>

@@ -5,13 +5,17 @@ export type PlayState = "idle" | "playing" | "done";
 export default function ControlBar({
   currentHour,
   playState,
+  whatIfOpen,
   onScrub,
   onPlay,
+  onToggleWhatIf,
 }: {
   currentHour: number;
   playState: PlayState;
+  whatIfOpen: boolean;
   onScrub: (hour: number) => void;
   onPlay: () => void;
+  onToggleWhatIf: () => void;
 }) {
   return (
     <div className="absolute bottom-5 left-1/2 z-[1000] flex -translate-x-1/2 items-center gap-5 rounded-2xl border border-white/10 bg-black/70 px-6 py-4 shadow-2xl backdrop-blur-md">
@@ -44,6 +48,17 @@ export default function ControlBar({
           H+{currentHour.toFixed(1)}
         </span>
       </div>
+
+      <button
+        onClick={onToggleWhatIf}
+        className={`h-10 rounded-xl border px-3 text-xs font-semibold tracking-wide transition-colors ${
+          whatIfOpen
+            ? "border-sky-400/60 bg-sky-500/20 text-sky-200"
+            : "border-white/15 text-neutral-300 hover:bg-white/10"
+        }`}
+      >
+        ⚗️ What-if
+      </button>
     </div>
   );
 }

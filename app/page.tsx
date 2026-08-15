@@ -22,12 +22,17 @@ import {
   type BroadcastEntry,
 } from "@/components/Navigator";
 import type { MapFocus } from "@/components/FireMap";
+import { WhatIfPanel, RiskCard } from "@/components/Panels";
 import {
   scenarios,
   defaultScenario,
+  defaultParams,
   shelterIsSafe,
   roadIsOpen,
+  riskAt,
+  type SimParams,
 } from "@/data/scenarios";
+import { distanceKm, type LatLng } from "@/lib/geo";
 import { useLiveAdvisories } from "@/lib/useLiveAdvisories";
 
 // Leaflet touches `window` at module scope — it must never run during SSR.
@@ -59,6 +64,15 @@ export default function Home() {
   const [broadcasts, setBroadcasts] = useState<BroadcastEntry[]>([]);
   const [authOpen, setAuthOpen] = useState(false);
   const [focus, setFocus] = useState<MapFocus>(null);
+  // What-if simulation parameters (default = scenario snapshot)
+  const [params, setParams] = useState<SimParams>(() =>
+    defaultParams(defaultScenario)
+  );
+  const [whatIfOpen, setWhatIfOpen] = useState(false);
+  // Click-anywhere risk probe
+  const [riskPoint, setRiskPoint] = useState<LatLng | null>(null);
+  const [showInfra, setShowInfra] = useState(false);
+  const [showZones, setShowZones] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [isWelcome, setIsWelcome] = useState(false);
   const [currentHour, setCurrentHour] = useState(0);
@@ -77,23 +91,42 @@ export default function Home() {
 
   const { advisories, isLive } = useLiveAdvisories(scenario, currentHour);
 
-  // Effective statuses = model prediction, unless an authority override exists.
+  // Effective statuses = model prediction (with what-if params), unless an
+  // authority override exists.
   const shelterStatus = useMemo(() => {
     const m: Record<string, boolean> = {};
     for (const s of scenario.shelters) {
       const ov = overrides[`shelter:${s.name}`];
-      m[s.name] = ov ? ov === "open" : shelterIsSafe(scenario, s, currentHour);
+      m[s.name] = ov
+        ? ov === "open"
+        : shelterIsSafe(scenario, s, currentHour, params);
     }
     return m;
-  }, [scenario, currentHour, overrides]);
+  }, [scenario, currentHour, overrides, params]);
   const roadStatus = useMemo(() => {
     const m: Record<string, boolean> = {};
     for (const r of scenario.roads) {
       const ov = overrides[`road:${r.name}`];
-      m[r.name] = ov ? ov === "open" : roadIsOpen(scenario, r, currentHour);
+      m[r.name] = ov
+        ? ov === "open"
+        : roadIsOpen(scenario, r, currentHour, params);
     }
     return m;
-  }, [scenario, currentHour, overrides]);
+  }, [scenario, currentHour, overrides, params]);
+
+  // Risk at the clicked point (recomputed live as the hour advances)
+  const risk = useMemo(
+    () => (riskPoint ? riskAt(scenario, riskPoint, currentHour, params) : null),
+    [riskPoint, scenario, currentHour, params]
+  );
+  const nearestSafeToRisk = useMemo(() => {
+    if (!riskPoint) return null;
+    const safe = scenario.shelters.filter((s) => shelterStatus[s.name]);
+    if (!safe.length) return null;
+    return [...safe].sort(
+      (a, b) => distanceKm(riskPoint, a) - distanceKm(riskPoint, b)
+    )[0];
+  }, [riskPoint, scenario, shelterStatus]);
 
   const safeCount = useMemo(
     () => Object.values(shelterStatus).filter(Boolean).length,
@@ -122,10 +155,13 @@ export default function Home() {
   useEffect(() => {
     const prev = prevOkRef.current;
     const newBanners: string[] = [];
+    let shelterFlipped = false;
     for (const [name, safe] of Object.entries(shelterStatus)) {
       const key = `shelter:${name}`;
-      if (prev.get(key) === true && !safe)
+      if (prev.get(key) === true && !safe) {
         newBanners.push(`⚠ ${name} is now inside the danger zone`);
+        shelterFlipped = true;
+      }
       prev.set(key, safe);
     }
     for (const [name, open] of Object.entries(roadStatus)) {
@@ -134,8 +170,18 @@ export default function Home() {
         newBanners.push(`⛔ ${name} closed`);
       prev.set(key, open);
     }
+    // Route recalculation moment: point evacuees at the new best shelter.
+    if (shelterFlipped) {
+      const stillSafe = scenario.shelters
+        .filter((s) => shelterStatus[s.name])
+        .sort((a, b) => a.distanceKm - b.distanceKm)[0];
+      if (stillSafe)
+        newBanners.push(
+          `🧭 Route changed — nearest safe shelter is now ${stillSafe.name}`
+        );
+    }
     pushBanners(newBanners);
-  }, [shelterStatus, roadStatus, pushBanners]);
+  }, [shelterStatus, roadStatus, scenario, pushBanners]);
   useEffect(() => {
     const timers = bannerTimersRef.current;
     return () => timers.forEach(clearTimeout);
@@ -213,6 +259,8 @@ export default function Home() {
       setFocus(null);
       setOverrides({});
       setBroadcasts([]);
+      setParams(defaultParams(next));
+      setRiskPoint(null);
       prevOkRef.current = new Map();
     },
     [stopAnimation]
@@ -277,8 +325,13 @@ export default function Home() {
         key={scenario.id}
         scenario={scenario}
         currentHour={currentHour}
+        params={params}
         shelterStatus={shelterStatus}
         roadStatus={roadStatus}
+        showInfra={showInfra}
+        showZones={showZones}
+        riskPoint={riskPoint}
+        onMapClick={setRiskPoint}
         focus={focus}
       />
 
@@ -324,6 +377,7 @@ export default function Home() {
                 <ShelterFinder
                   scenario={scenario}
                   currentHour={currentHour}
+                  params={params}
                   shelterStatus={shelterStatus}
                   onLocate={setFocus}
                 />
@@ -331,6 +385,7 @@ export default function Home() {
                 <CommandPanel
                   scenario={scenario}
                   currentHour={currentHour}
+                  params={params}
                   shelterStatus={shelterStatus}
                   roadStatus={roadStatus}
                   advisoryText={
@@ -346,13 +401,41 @@ export default function Home() {
                 <BriefingPanel
                   scenario={scenario}
                   currentHour={currentHour}
+                  params={params}
                   shelterStatus={shelterStatus}
                   roadStatus={roadStatus}
                 />
               )}
             </div>
           )}
-          <Legend />
+          <Legend
+            showInfra={showInfra}
+            showZones={showZones}
+            onToggleInfra={() => setShowInfra((v) => !v)}
+            onToggleZones={() => setShowZones((v) => !v)}
+          />
+          {risk && riskPoint && (
+            <RiskCard
+              risk={risk}
+              nearestSafe={nearestSafeToRisk}
+              onLocate={() =>
+                nearestSafeToRisk &&
+                setFocus({
+                  lat: nearestSafeToRisk.lat,
+                  lng: nearestSafeToRisk.lng,
+                  nonce: Date.now(),
+                })
+              }
+              onClose={() => setRiskPoint(null)}
+            />
+          )}
+          <WhatIfPanel
+            open={whatIfOpen}
+            scenario={scenario}
+            params={params}
+            onChange={setParams}
+            onReset={() => setParams(defaultParams(scenario))}
+          />
         </>
       )}
 
@@ -362,6 +445,7 @@ export default function Home() {
             <StatsBar
               scenario={scenario}
               currentHour={currentHour}
+              params={params}
               safeCount={safeCount}
               roadsOpen={roadsOpen}
             />
@@ -378,8 +462,10 @@ export default function Home() {
         <ControlBar
           currentHour={currentHour}
           playState={playState}
+          whatIfOpen={whatIfOpen}
           onScrub={handleScrub}
           onPlay={handlePlay}
+          onToggleWhatIf={() => setWhatIfOpen((v) => !v)}
         />
       )}
 

@@ -31,6 +31,34 @@ export function destinationPoint(
   return { lat: toDeg(φ2), lng: toDeg(λ2) };
 }
 
+/** Great-circle distance in km. */
+export function distanceKm(a: LatLng, b: LatLng): number {
+  const φ1 = toRad(a.lat);
+  const φ2 = toRad(b.lat);
+  const dφ = toRad(b.lat - a.lat);
+  const dλ = toRad(b.lng - a.lng);
+  const h =
+    Math.sin(dφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(dλ / 2) ** 2;
+  return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(h));
+}
+
+/** Initial bearing from a to b, degrees 0-360. */
+export function bearingBetween(a: LatLng, b: LatLng): number {
+  const φ1 = toRad(a.lat);
+  const φ2 = toRad(b.lat);
+  const dλ = toRad(b.lng - a.lng);
+  const y = Math.sin(dλ) * Math.cos(φ2);
+  const x =
+    Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(dλ);
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+
+/** Smallest absolute difference between two bearings, 0-180. */
+export function angleDiff(a: number, b: number): number {
+  const d = Math.abs(((a - b) % 360) + 360) % 360;
+  return d > 180 ? 360 - d : d;
+}
+
 /** Ray-casting point-in-polygon on plain lat/lng coordinates. */
 export function pointInPolygon(point: LatLng, polygon: LatLng[]): boolean {
   if (polygon.length < 3) return false;

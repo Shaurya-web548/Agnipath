@@ -208,6 +208,39 @@ body {
   50%      { transform: scale(1.18); }
 }
 
+/* ── Infrastructure markers ── */
+.infra-dot {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  line-height: 1;
+  border-radius: 5px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1.5px solid rgba(148, 163, 184, 0.6);
+}
+
+.infra-dot.threatened {
+  border-color: rgba(239, 68, 68, 0.9);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+  animation: road-pulse 1.6s ease-in-out infinite;
+}
+
+/* ── Risk pin ── */
+.risk-pin {
+  font-size: 22px;
+  line-height: 1;
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.4));
+  animation: pin-drop 0.4s ease-out 1;
+}
+
+@keyframes pin-drop {
+  0%   { transform: translateY(-14px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
 /* ── Wind widget streaks ── */
 .wind-streak {
   position: absolute;

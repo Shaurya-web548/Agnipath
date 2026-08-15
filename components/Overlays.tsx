@@ -3,10 +3,13 @@
 import { motion, AnimatePresence } from "framer-motion";
 import {
   type Scenario,
+  type SimParams,
   scenarios,
   coneReachKm,
   smokeReachKm,
   bearingToCompass,
+  spreadConfidencePct,
+  routeConfidencePct,
 } from "@/data/scenarios";
 
 export function TitleChip({
@@ -94,16 +97,18 @@ export function WindWidget({ scenario }: { scenario: Scenario }) {
 export function StatsBar({
   scenario,
   currentHour,
+  params,
   safeCount,
   roadsOpen,
 }: {
   scenario: Scenario;
   currentHour: number;
+  params: SimParams;
   safeCount: number;
   roadsOpen: number;
 }) {
-  const reach = coneReachKm(scenario, currentHour);
-  const smoke = smokeReachKm(scenario, currentHour);
+  const reach = coneReachKm(scenario, currentHour, params);
+  const smoke = smokeReachKm(scenario, currentHour, params);
   return (
     <motion.div
       initial={{ opacity: 0, x: 12 }}
@@ -158,9 +163,18 @@ export function StatsBar({
         <div className="flex justify-between gap-6">
           <span className="text-neutral-400">Wind</span>
           <span className="text-sky-200">
-            {scenario.wind.speedKmh} km/h{" "}
-            {bearingToCompass(scenario.wind.bearingDeg)}
+            {params.windSpeedKmh} km/h {bearingToCompass(params.windBearingDeg)}
           </span>
+        </div>
+        <div className="flex justify-between gap-6 border-t border-white/10 pt-1">
+          <span className="text-neutral-400">Spread conf.</span>
+          <span className="text-neutral-300">
+            ~{spreadConfidencePct(currentHour)}%
+          </span>
+        </div>
+        <div className="flex justify-between gap-6">
+          <span className="text-neutral-400">Route conf.</span>
+          <span className="text-neutral-300">~{routeConfidencePct()}%</span>
         </div>
       </div>
     </motion.div>
@@ -188,10 +202,20 @@ export function WarningBanners({ banners }: { banners: string[] }) {
   );
 }
 
-export function Legend() {
+export function Legend({
+  showInfra,
+  showZones,
+  onToggleInfra,
+  onToggleZones,
+}: {
+  showInfra: boolean;
+  showZones: boolean;
+  onToggleInfra: () => void;
+  onToggleZones: () => void;
+}) {
   const rows: [string, string][] = [
     ["🔥", "Active fire"],
-    ["🟧", "Projected fire spread"],
+    ["🟧", "Spread bands 70/40/15%"],
     ["▒", "Smoke / low visibility"],
     ["🟢", "Shelter — safe"],
     ["🔴", "Shelter — unsafe"],
@@ -215,6 +239,29 @@ export function Legend() {
             <span>{label}</span>
           </div>
         ))}
+      </div>
+      <div className="mt-1.5 space-y-1 border-t border-white/10 pt-1.5 text-[11px]">
+        <label className="flex cursor-pointer items-center gap-2 text-neutral-300">
+          <input
+            type="checkbox"
+            checked={showInfra}
+            onChange={onToggleInfra}
+            className="accent-orange-500"
+          />
+          🏗️ Infrastructure
+        </label>
+        <label className="flex cursor-pointer items-center gap-2 text-neutral-300">
+          <input
+            type="checkbox"
+            checked={showZones}
+            onChange={onToggleZones}
+            className="accent-orange-500"
+          />
+          👥 Population zones
+        </label>
+      </div>
+      <div className="mt-1 text-[9px] text-neutral-600">
+        Click anywhere on the map for a risk score
       </div>
     </motion.div>
   );

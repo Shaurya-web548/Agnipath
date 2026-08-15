@@ -7,17 +7,25 @@ import {
   Marker,
   Polygon,
   Polyline,
+  Circle,
   Tooltip,
   useMap,
+  useMapEvents,
 } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import {
   type Scenario,
   type PointFeature,
+  type SimParams,
   conePolygon,
   smokePolygon,
+  timeToThreatMin,
+  formatEta,
+  zonePriorities,
+  SPREAD_BANDS,
 } from "@/data/scenarios";
+import type { LatLng } from "@/lib/geo";
 
 const INDIA_CENTER: [number, number] = [21.5, 78.5];
 
@@ -58,10 +66,22 @@ function roadIcon(open: boolean) {
   });
 }
 
-/**
- * Curved path from just outside the fire to just short of the shelter:
- * quadratic bezier bowed perpendicular to the straight line.
- */
+function infraIcon(icon: string, threatened: boolean) {
+  return L.divIcon({
+    className: "",
+    html: `<div class="infra-dot${threatened ? " threatened" : ""}">${icon}</div>`,
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
+  });
+}
+
+const riskPinIcon = L.divIcon({
+  className: "",
+  html: '<div class="risk-pin">📍</div>',
+  iconSize: [26, 26],
+  iconAnchor: [13, 24],
+});
+
 function evacCurve(
   fire: { lat: number; lng: number },
   to: PointFeature
@@ -103,7 +123,6 @@ function arrowheadIcon(bearingDeg: number) {
   });
 }
 
-/** Cinematic intro: wide India view, then fly to the fire. */
 function IntroFly({ target }: { target: [number, number] }) {
   const map = useMap();
   const flown = useRef(false);
@@ -118,7 +137,6 @@ function IntroFly({ target }: { target: [number, number] }) {
   return null;
 }
 
-/** Pans to a user-requested feature (shelter finder "Locate" buttons). */
 function FocusFly({ focus }: { focus: MapFocus }) {
   const map = useMap();
   const lastNonce = useRef(0);
@@ -130,41 +148,76 @@ function FocusFly({ focus }: { focus: MapFocus }) {
   return null;
 }
 
+function ClickCatcher({ onClick }: { onClick: (p: LatLng) => void }) {
+  useMapEvents({
+    click: (e) => onClick({ lat: e.latlng.lat, lng: e.latlng.lng }),
+  });
+  return null;
+}
+
+const ZONE_COLORS: Record<string, string> = {
+  IMMEDIATE: "#ef4444",
+  HIGH: "#f97316",
+  MONITOR: "#eab308",
+  LOW: "#22c55e",
+};
+
 export default function FireMap({
   scenario,
   currentHour,
+  params,
   shelterStatus,
   roadStatus,
+  showInfra,
+  showZones,
+  riskPoint,
+  onMapClick,
   focus = null,
 }: {
   scenario: Scenario;
   currentHour: number;
-  /** Effective statuses (model + authority overrides), keyed by name. */
+  params: SimParams;
   shelterStatus: Record<string, boolean>;
   roadStatus: Record<string, boolean>;
+  showInfra: boolean;
+  showZones: boolean;
+  riskPoint: LatLng | null;
+  onMapClick: (p: LatLng) => void;
   focus?: MapFocus;
 }) {
   const fireCenter: [number, number] = [scenario.fire.lat, scenario.fire.lng];
 
-  const cone = useMemo(
+  const bands = useMemo(
     () =>
-      conePolygon(scenario, currentHour).map(
-        (p) => [p.lat, p.lng] as [number, number]
-      ),
-    [scenario, currentHour]
+      SPREAD_BANDS.map((b) => ({
+        ...b,
+        positions: conePolygon(
+          scenario,
+          currentHour,
+          params,
+          b.radiusScale,
+          b.extraHalfAngle
+        ).map((p) => [p.lat, p.lng] as [number, number]),
+      })),
+    [scenario, currentHour, params]
   );
 
   const smoke = useMemo(
     () =>
-      smokePolygon(scenario, currentHour).map(
+      smokePolygon(scenario, currentHour, params).map(
         (p) => [p.lat, p.lng] as [number, number]
       ),
-    [scenario, currentHour]
+    [scenario, currentHour, params]
   );
 
   const safeByName = useMemo(
     () => new Map(Object.entries(shelterStatus)),
     [shelterStatus]
+  );
+
+  const zonePrio = useMemo(
+    () => (showZones ? zonePriorities(scenario, currentHour, params) : []),
+    [showZones, scenario, currentHour, params]
   );
 
   // One-shot flip animation bookkeeping
@@ -215,6 +268,7 @@ export default function FireMap({
     >
       <IntroFly target={fireCenter} />
       <FocusFly focus={focus} />
+      <ClickCatcher onClick={onMapClick} />
       <TileLayer
         url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
@@ -222,7 +276,28 @@ export default function FireMap({
         maxZoom={20}
       />
 
-      {/* Smoke plume: wider + longer than the flame cone, drawn beneath it */}
+      {/* Population zones (toggleable) */}
+      {zonePrio.map(({ zone, label, riskPct }) => (
+        <Circle
+          key={zone.name}
+          center={[zone.lat, zone.lng]}
+          radius={zone.radiusKm * 1000}
+          pathOptions={{
+            color: ZONE_COLORS[label],
+            weight: 1.5,
+            opacity: 0.55,
+            fillColor: ZONE_COLORS[label],
+            fillOpacity: 0.13,
+          }}
+        >
+          <Tooltip sticky>
+            {zone.name} · pop {zone.population.toLocaleString("en-IN")} · risk{" "}
+            {riskPct}% · {label}
+          </Tooltip>
+        </Circle>
+      ))}
+
+      {/* Smoke plume beneath the spread bands */}
       {smoke.length >= 3 && (
         <Polygon
           positions={smoke}
@@ -239,20 +314,28 @@ export default function FireMap({
         </Polygon>
       )}
 
-      {cone.length >= 3 && (
-        <Polygon
-          positions={cone}
-          pathOptions={{
-            color: "#ff8c42",
-            weight: 2,
-            dashArray: "10 8",
-            fillColor: "#ff5a1f",
-            fillOpacity: 0.25,
-            className: "cone-path",
-          }}
-        >
-          <Tooltip sticky>Projected fire-spread zone</Tooltip>
-        </Polygon>
+      {/* Spread probability bands: outer (least likely) first */}
+      {[...bands].reverse().map(
+        (b) =>
+          b.positions.length >= 3 && (
+            <Polygon
+              key={b.label}
+              positions={b.positions}
+              pathOptions={{
+                color: "#ff8c42",
+                weight: b.radiusScale === 1 ? 2 : 1,
+                opacity: b.radiusScale === 1 ? 1 : 0.35,
+                dashArray: b.radiusScale === 1 ? "10 8" : "4 8",
+                fillColor: "#ff5a1f",
+                fillOpacity: b.fillOpacity,
+                className: b.radiusScale === 1 ? "cone-path" : undefined,
+              }}
+            >
+              <Tooltip sticky>
+                Spread band {b.label} (model band, not ML)
+              </Tooltip>
+            </Polygon>
+          )
       )}
 
       {/* Curved evacuation arrows — only toward currently-safe shelters */}
@@ -287,8 +370,28 @@ export default function FireMap({
         </Tooltip>
       </Marker>
 
+      {/* Critical infrastructure (toggleable) */}
+      {showInfra &&
+        scenario.infrastructure.map((f) => {
+          const eta = timeToThreatMin(scenario, f, currentHour, params);
+          const threatened = eta !== null && eta <= 60;
+          return (
+            <Marker
+              key={f.name}
+              position={[f.lat, f.lng]}
+              icon={infraIcon(f.icon, threatened)}
+              zIndexOffset={300}
+            >
+              <Tooltip direction="top" offset={[0, -10]}>
+                {f.name} — {formatEta(eta)}
+              </Tooltip>
+            </Marker>
+          );
+        })}
+
       {scenario.roads.map((r) => {
         const open = roadStatus[r.name];
+        const eta = timeToThreatMin(scenario, r, currentHour, params);
         return (
           <Marker
             key={r.name}
@@ -297,7 +400,7 @@ export default function FireMap({
             zIndexOffset={400}
           >
             <Tooltip direction="top" offset={[0, -10]}>
-              {r.name} — {open ? "OPEN" : "CLOSED"}
+              {r.name} — {open ? `OPEN · ${formatEta(eta)}` : "CLOSED"}
             </Tooltip>
           </Marker>
         );
@@ -305,6 +408,7 @@ export default function FireMap({
 
       {scenario.shelters.map((s) => {
         const safe = safeByName.get(s.name)!;
+        const eta = timeToThreatMin(scenario, s, currentHour, params);
         return (
           <Marker
             key={s.name}
@@ -313,11 +417,21 @@ export default function FireMap({
             zIndexOffset={500}
           >
             <Tooltip direction="top" offset={[0, -10]}>
-              {s.name} — {safe ? "SAFE" : "UNSAFE"}
+              {s.name} — {safe ? `SAFE · ${formatEta(eta)}` : "UNSAFE"} · cap{" "}
+              {s.capacity} ({s.occupancyPct}% full)
             </Tooltip>
           </Marker>
         );
       })}
+
+      {riskPoint && (
+        <Marker
+          position={[riskPoint.lat, riskPoint.lng]}
+          icon={riskPinIcon}
+          zIndexOffset={1200}
+          interactive={false}
+        />
+      )}
     </MapContainer>
   );
 }
