@@ -11,6 +11,7 @@ import {
   WarningBanners,
 } from "@/components/Overlays";
 import { shelters, shelterIsSafe } from "@/data/scenario";
+import { useLiveAdvisories } from "@/lib/useLiveAdvisories";
 
 // Leaflet touches `window` at module scope — it must never run during SSR.
 const FireMap = dynamic(() => import("@/components/FireMap"), {
@@ -35,6 +36,8 @@ export default function Home() {
   const [playState, setPlayState] = useState<PlayState>("idle");
   const rafRef = useRef<number | null>(null);
   const startProgressRef = useRef(0);
+
+  const { advisories, isLive } = useLiveAdvisories(currentHour);
 
   const safeCount = useMemo(
     () => shelters.filter((s) => shelterIsSafe(s, currentHour)).length,
@@ -165,7 +168,11 @@ export default function Home() {
             <StatsBar currentHour={currentHour} safeCount={safeCount} />
           </>
         )}
-        <AdvisoryPanel currentHour={currentHour} />
+        <AdvisoryPanel
+          currentHour={currentHour}
+          advisories={advisories}
+          liveDot={isLive}
+        />
       </div>
 
       {!recMode && (
