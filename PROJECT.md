@@ -30,15 +30,31 @@ role-specific guidance:
 ## Key features
 
 - **Time-scrubbed simulation** — slider + PLAY animates hours 0→6 (~8 s, eased)
-- **Hazard layers** — flame cone, wider smoke/low-visibility plume, road
-  checkpoints that close as the cone reaches them
+- **Probability bands** — nested 70/40/15% spread cones (model bands, honestly
+  labelled), plus a wider smoke/low-visibility plume
+- **Time-to-threat everywhere** — "~47 min to threat" on every shelter, road
+  checkpoint and infrastructure tooltip; road closures forecast before they
+  happen
+- **What-if simulation** — sliders for wind speed/direction, temperature and
+  humidity reshape the cone and every downstream status live (judges can play)
+- **Click-anywhere risk score** — explainable 0–100 risk at any map point
+  (factor breakdown, ETA, recommended action, nearest safe shelter)
+- **Shelter optimization** — capacity + occupancy bars; RECOMMENDED =
+  distance + headroom + fire risk, re-ranked live
+- **Command Mode (authorities, sign-in gated)** — force-close/reopen shelters
+  and roads, broadcast console with ops log, evacuation priority by
+  risk × population zones, rule-based resource recommendations, and an ops
+  assistant (offline rule-based answers; optional Gemini layer)
+- **Toggleable layers** — critical infrastructure with threat ETAs,
+  population zones colored by priority
+- **Confidence labels** — spread confidence decays with forecast horizon
 - **Two regions** — Uttarakhand (Bhowali forest) and Himachal (Shimla forest
   belt), each with its own fire, wind, shelters, and checkpoints
 - **Bilingual advisories** — typewriter-revealed official messages in English
   and Hindi with ADVISORY / WARNING / EVACUATE urgency levels
-- **Optional live AI** — Gemini rewrites each hour's advisory from the exact
-  simulation numbers; any error or 4 s timeout falls back silently to canned
-  text (green/grey dot shows which is active)
+- **Optional live AI** — Gemini rewrites each hour's advisory (and answers
+  ops questions) from the exact simulation numbers; any error or 4 s timeout
+  falls back silently to canned text (green/grey dot shows which is active)
 - **REC mode** — press R: hides all controls and auto-plays for clean video
   capture
 
