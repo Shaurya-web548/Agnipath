@@ -286,6 +286,7 @@ export default function Home() {
       <AboutModal
         open={aboutOpen}
         welcome={isWelcome}
+        scenario={scenario}
         onClose={() => setAboutOpen(false)}
         onPickMode={setMode}
       />

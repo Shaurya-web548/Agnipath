@@ -28,7 +28,16 @@ export type Scenario = {
   smokeRadiusFactor: number;
   shelters: PointFeature[];
   roads: PointFeature[]; // road checkpoints that close when the cone reaches them
+  whyHere: string; // why this region is a realistic wildfire scenario
 };
+
+// Real, well-known Indian emergency numbers — shown to residents.
+export const helplines = [
+  { number: "112", label: "All emergencies" },
+  { number: "101", label: "Fire" },
+  { number: "108", label: "Ambulance" },
+  { number: "1070", label: "State disaster control room" },
+];
 
 function place(
   fire: { lat: number; lng: number },
@@ -76,6 +85,8 @@ export const scenarios: Scenario[] = [
       { name: "Bhowali road checkpoint", bearingDeg: 50, distanceKm: 2.5 }, // ~H+1.4
       { name: "Jeolikote bypass", bearingDeg: 25, distanceKm: 6 }, // ~H+3.3
     ]),
+    whyHere:
+      "Uttarakhand's chir-pine belts are among India's most fire-prone forests. In the April–May 2024 season, over a thousand forest fires were recorded in the state, including major fires in the Nainital hills around Bhowali and Jeolikote — the exact geography this snapshot represents.",
   },
   {
     id: "himachal",
@@ -98,6 +109,8 @@ export const scenarios: Scenario[] = [
       { name: "Kufri road checkpoint", bearingDeg: 130, distanceKm: 3 }, // ~H+2
       { name: "Fagu bend checkpoint", bearingDeg: 150, distanceKm: 6 }, // ~H+4
     ]),
+    whyHere:
+      "Himachal's Shimla forest belt shares the same chir-pine fire ecology and reported hundreds of forest fires in recent dry summers, with tourist towns like Kufri and Mashobra sitting directly against forest edges.",
   },
 ];
 

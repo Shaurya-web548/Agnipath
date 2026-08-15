@@ -3,6 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import {
   type Scenario,
+  helplines,
   coneReachKm,
   smokeReachKm,
   shelterIsSafe,
@@ -110,6 +111,21 @@ export function ShelterFinder({
           </div>
         ))}
       </div>
+      <div className="mt-2.5 rounded-lg border border-red-500/30 bg-red-950/30 px-2.5 py-1.5">
+        <div className="text-[10px] font-semibold uppercase tracking-widest text-red-300">
+          Emergency helplines
+        </div>
+        <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px]">
+          {helplines.map((h) => (
+            <span key={h.number} className="text-neutral-300">
+              <span className="font-mono font-bold text-red-300">
+                {h.number}
+              </span>{" "}
+              {h.label}
+            </span>
+          ))}
+        </div>
+      </div>
       <p className="mt-2 text-[10px] leading-snug text-neutral-500">
         Distances are straight-line from the fire point. Follow official routes
         on the ground.
@@ -180,6 +196,13 @@ export function BriefingPanel({
               : "Pre-position crews downwind; brief shelters on likely arrivals."}
           </dd>
         </div>
+        <div>
+          <dt className="font-semibold text-neutral-100">Authority actions</dt>
+          <dd>
+            Broadcast this hour&apos;s advisory (panel on the right, EN/हिन्दी),
+            update shelter and road status boards, staff the ⛔ checkpoints.
+          </dd>
+        </div>
       </dl>
     </div>
   );
@@ -188,11 +211,13 @@ export function BriefingPanel({
 export function AboutModal({
   open,
   welcome,
+  scenario,
   onClose,
   onPickMode,
 }: {
   open: boolean;
   welcome: boolean;
+  scenario: Scenario;
   onClose: () => void;
   onPickMode: (m: AppMode) => void;
 }) {
@@ -217,20 +242,29 @@ export function AboutModal({
             <h1 className="text-xl font-semibold">
               🔥 AgniPath — Wildfire Evacuation Planner
             </h1>
-            <p className="mt-2 text-sm leading-relaxed text-neutral-300">
-              When a wildfire starts, the hardest questions are human ones:{" "}
-              <em>what is happening, where should I go, and what closes next?</em>{" "}
-              AgniPath replays a wind-driven spread forecast from a saved
-              satellite snapshot — fire cone, smoke, shelters, road closures —
-              and rewrites the official advisory for every hour, in English and
-              Hindi.
-            </p>
+
+            <div className="mt-3 rounded-xl border border-red-500/30 bg-red-950/30 px-4 py-2.5">
+              <div className="text-[10px] font-semibold uppercase tracking-widest text-red-300">
+                In a real emergency, call
+              </div>
+              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-sm">
+                {helplines.map((h) => (
+                  <span key={h.number} className="text-neutral-200">
+                    <span className="font-mono font-bold text-red-300">
+                      {h.number}
+                    </span>{" "}
+                    <span className="text-xs text-neutral-400">{h.label}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+
             <div className="mt-4 space-y-2">
               {(
                 [
                   ["sim", "🎬 Watch the simulation", "Replay the 6-hour spread story with PLAY."],
-                  ["shelters", "🧭 Find a safe shelter", "Ranked list of shelters, nearest safe first."],
-                  ["briefing", "📋 Situation briefing", "One-glance summary for responders."],
+                  ["shelters", "🧭 Find a safe shelter", "For residents: ranked shelters, nearest safe first, plus helplines."],
+                  ["briefing", "📋 Situation briefing", "For authorities: closures at a glance, hourly EN/हिन्दी advisory drafts ready to broadcast."],
                 ] as [AppMode, string, string][]
               ).map(([id, label, desc]) => (
                 <button
@@ -248,7 +282,16 @@ export function AboutModal({
                 </button>
               ))}
             </div>
-            <p className="mt-4 text-[11px] leading-snug text-neutral-500">
+            <div className="mt-4 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+              <div className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400">
+                Why {scenario.name.split(" — ")[0]}?
+              </div>
+              <p className="mt-0.5 text-[11px] leading-snug text-neutral-400">
+                {scenario.whyHere}
+              </p>
+            </div>
+
+            <p className="mt-3 text-[11px] leading-snug text-neutral-500">
               Simplified wind-cone model on snapshot data — a communication
               prototype, not a fire-behaviour model. Press R for recording mode.
             </p>
